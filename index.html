@@ -219,7 +219,7 @@ const TR=c=>TRESO.find(t=>t[0]===c);
 const isTreso=c=>!!TR(c);
 const JR={CA:'Caisse',BQ:'Banque',MM:'Mobile money',AC:'Achats',VE:'Ventes',PA:'Paie',OD:'Opérations diverses',AN:'À-nouveaux'};
 const STK={'311':{l:'Marchandises',ach:'601',v:'6031'},'321':{l:'Matières premières',ach:'602',v:'6032'},'331':{l:'Fournitures consommables',ach:'604',v:'6033'},'361':{l:'Produits finis',ach:null,v:'736'}};
-const COLL=['users','accounts','acts','tiers','items','emps','docs','entries','pays','slips','moves','assets','recs','log'];
+const COLL=['users','roles','accounts','acts','tiers','items','emps','docs','entries','pays','slips','moves','assets','recs','log'];
 const ROLES=['Gérant','Comptable','Saisie'];
 
 /* ============ ÉTAT ============ */
@@ -233,8 +233,13 @@ const live=a=>a.filter(x=>!x.del);
 const byId=(c,id)=>id?D[c].find(x=>x.id===id):undefined;
 const meU=()=>byId('users',ME);
 const role=()=>meU()?.role||'Saisie';
-const isAdmin=()=>['Gérant','Comptable'].includes(role());
+const PERMS=[['valider','Valider les écritures, émettre factures et avoirs, encaisser, contrepasser'],['etats','Voir le tableau de bord et les états financiers'],['paie','Gérer les employés et la paie'],['stocks','Gérer les stocks (articles et mouvements)'],['immo','Immobilisations et rapprochement bancaire'],['tiers','Créer et modifier clients et fournisseurs']];
+const BUILTIN={'Gérant':null,'Comptable':null,'Saisie':['stocks','tiers']};
+function perm(p,u){u=u||meU();if(!u)return false;const r=u.role;if(r==='Gérant'||r==='Comptable')return true;if(r==='Saisie')return BUILTIN.Saisie.includes(p);const ro=D.roles&&D.roles.find(x=>x.id===r&&!x.del);return !!(ro&&ro.perms&&ro.perms[p])}
+const roleName=r=>BUILTIN[r]!==undefined?r:((D.roles||[]).find(x=>x.id===r)||{}).nom||'Rôle supprimé';
+const isAdmin=()=>perm('valider');
 const isGerant=()=>role()==='Gérant';
+const keyOK=(k,r)=>!!k&&(!k.rev||(r.upd||0)<k.rev);
 const accLib=c=>(D.accounts.find(a=>a.code===c&&!a.del)||{}).lib||'Compte '+c;
 const accs=()=>live(D.accounts).sort((a,b)=>a.code.localeCompare(b.code));
 const actNom=id=>(byId('acts',id)||{}).nom||'—';
@@ -279,13 +284,15 @@ function canWrite(u,c,r,old){
   if(r.by!==u.id)return 'auteur incohérent';
   if(old&&old.cr!==r.cr)return 'créateur modifié';
   if(!old&&r.cr!==u.id)return 'créateur incohérent';
-  const R=u.role,adm=R==='Gérant'||R==='Comptable',own=r.cr===u.id,dt=recDate(c,r),odt=recDate(c,old);
+  const R=u.role,adm=perm('valider',u),own=r.cr===u.id,dt=recDate(c,r),odt=recDate(c,old);
   if(old&&old.del)return 'élément déjà supprimé';
   switch(c){
-    case 'users':if(R!=='Gérant')return 'gestion des utilisateurs réservée au gérant';if(!ROLES.includes(r.role))return 'rôle inconnu';break;
+    case 'users':if(R!=='Gérant')return 'gestion des utilisateurs réservée au gérant';if(!ROLES.includes(r.role)&&!/^r_[A-Za-z0-9_-]{1,40}$/.test(r.role||''))return 'rôle inconnu';break;
+    case 'roles':if(R!=='Gérant')return 'gestion des rôles réservée au gérant';if(!/^r_/.test(r.id))return 'rôle invalide';break;
     case 'accounts':case 'acts':if(!adm)return 'réservé au gérant ou au comptable';break;
-    case 'emps':if(!adm)return 'paie réservée au gérant ou au comptable';break;
-    case 'tiers':case 'items':if(!adm&&old&&!own)return 'modification réservée à son auteur';break;
+    case 'emps':if(!perm('paie',u))return 'droit « paie » requis';break;
+    case 'tiers':if(!perm('tiers',u))return 'droit « clients et fournisseurs » requis';if(!adm&&old&&!own)return 'modification réservée à son auteur';break;
+    case 'items':if(!perm('stocks',u))return 'droit « stocks » requis';if(!adm&&old&&!own)return 'modification réservée à son auteur';break;
     case 'log':if(old)return 'journal d\'audit intangible';break;
     case 'entries':
       if(old&&old.st==='V')return 'écriture validée intangible (utilisez la contrepassation)';
@@ -307,7 +314,7 @@ function canWrite(u,c,r,old){
       else if(lockedFor(dt,r.upd))return 'période clôturée';
       break;
     case 'slips':
-      if(!adm)return 'paie réservée au gérant ou au comptable';
+      if(!perm('paie',u))return 'droit « paie » requis';
       if(old){const t=old.st+'>'+r.st;
         if(old.st==='B'){if(lockedFor(dt,r.upd)&&!r.del)return 'période clôturée'}
         else if(t==='V>P'){if(!sameExcept(old,r,['st','paid','payEntry']))return 'bulletin validé intangible'}
@@ -317,18 +324,19 @@ function canWrite(u,c,r,old){
       else if(r.st!=='B'&&lockedFor(dt,r.upd))return 'période clôturée';
       break;
     case 'moves':
+      if(!perm('stocks',u))return 'droit « stocks » requis';
       if(old){if(!(old.st==='V'&&r.st==='X'&&sameExcept(old,r,['st','rev'])))return 'mouvement intangible'}
       else if(lockedFor(dt,r.upd))return 'période clôturée';
       if(!adm&&r.entryId)return 'écriture d\'achat réservée au gérant ou au comptable';
       break;
     case 'assets':
-      if(!adm)return 'immobilisations réservées au gérant ou au comptable';
+      if(!perm('immo',u))return 'droit « immobilisations » requis';
       if(old&&old.st!=='V')return 'immobilisation cédée intangible';
       if(old&&!(r.st==='V'?sameExcept(old,r,['nom','act']):(r.st==='C'&&sameExcept(old,r,['st','cession']))))return 'immobilisation : seuls le nom, l\'activité ou la cession peuvent changer';
       if(!(+r.cout>0)||!(+r.duree>=0)||!/^2[0-7]/.test(r.compte||''))return 'immobilisation invalide';
       break;
     case 'recs':
-      if(!adm)return 'rapprochement réservé au gérant ou au comptable';
+      if(!perm('immo',u))return 'droit « rapprochement » requis';
       if(old)return 'rapprochement validé intangible';
       if(lockedFor(dt,r.upd))return 'période clôturée';
       break;
@@ -346,6 +354,7 @@ function canWriteSettings(u,s,old){
 async function signRec(r){r.sig=b64e(await crypto.subtle.sign(ECS,PRIV,enc.encode(canon(r))))}
 const newer=(a,b)=>!b||a.ver>b.ver||(a.ver===b.ver&&(a.upd>b.upd||(a.upd===b.upd&&String(a.dev)>String(b.dev))));
 async function commit(c,r,action,sum,opt={}){
+  {const mu=meU(),mk=mu&&mu.keys.find(k=>k.kid===KID);if(mk&&mk.rev)throw new Error('L\'accès de cet appareil a été révoqué par le gérant')}
   const old=D[c].find(x=>x.id===r.id);
   const oldCopy=old?JSON.parse(JSON.stringify(old)):null;
   r.cr=old?old.cr:ME;r.by=ME;r.kid=KID;r.ver=(old?.ver||0)+1;r.upd=NOW();r.dev=HDR.dev;delete r.sig;
@@ -380,7 +389,7 @@ async function verifyAudit(){
       const h=await sha(l.prev+'|'+canon({dev:l.dev,seq:l.seq,at:l.at,by:l.by,a:l.a,coll:l.coll,rid:l.rid,sum:l.sum}));
       if(h!==l.h){ok=false;why='empreinte falsifiée au n° '+l.seq;break}
       const u=byId('users',l.by),k=u&&u.keys.find(k=>k.kid===l.kid);
-      if(!k||!await verifySig(l,k)){ok=false;why='signature invalide au n° '+l.seq;break}
+      if(!k||!keyOK(k,l)||!await verifySig(l,k)){ok=false;why=(k&&!keyOK(k,l)?'appareil révoqué':'signature invalide')+' au n° '+l.seq;break}
       prev=l.h}
     res.push({dev,n:ls.length,ok,why,last:ls[ls.length-1]})}
   return res;
@@ -424,7 +433,7 @@ async function merge(inc,join){
       if(old&&!newer(u,old)){u._ok=1;rep.same++;continue}
       let signer=null,key=null;
       if(join&&u.by===u.id&&u.role==='Gérant'&&!old){signer=u;key=u.keys.find(k=>k.kid===u.kid)}
-      else{signer=old&&u.by===u.id?old:D.users.find(x=>x.id===u.by&&!x.del);key=signer&&signer.keys.find(k=>k.kid===u.kid)}
+      else{signer=old&&u.by===u.id?old:D.users.find(x=>x.id===u.by&&!x.del);key=signer&&signer.keys.find(k=>k.kid===u.kid);if(key&&!keyOK(key,u))key=null}
       if(!signer||!key)continue;
       if(signer.role!=='Gérant'||signer.actif===false)continue;
       if(!await verifySig(u,key)){u._ok=1;rej('users',u,'signature invalide');continue}
@@ -435,7 +444,7 @@ async function merge(inc,join){
   for(const u of D.users)delete u._ok;
   // 2. réglages
   if(inc.settings){const s=clean(inc.settings);const old=D.settings;
-    if(!old||newer(s,old)){const u=D.users.find(x=>x.id===s.by),k=u&&u.keys.find(k=>k.kid===s.kid);
+    if(!old||newer(s,old)){const u=D.users.find(x=>x.id===s.by),k0=u&&u.keys.find(k=>k.kid===s.kid),k=keyOK(k0,s)?k0:null;
       const err=!k?'auteur inconnu':!await verifySig(s,k)?'signature invalide':(s.logo&&!RX.img.test(s.logo))||(s.signature&&!RX.img.test(s.signature))?'image invalide':(s.lock&&!RX.date.test(s.lock))?'date de clôture invalide':(s.syncUrl&&!RX.srv.test(s.syncUrl))?'adresse serveur invalide':canWriteSettings(u,s,old);
       if(err)rej('settings',s,err);else{D.settings=s;rep.acc++}}}
   if(!D.settings)throw new Error('Fichier sans réglages valides');
@@ -447,6 +456,7 @@ async function merge(inc,join){
       if(old&&!newer(r,old)){rep.same++;continue}
       const u=D.users.find(x=>x.id===r.by),k=u&&u.keys.find(k=>k.kid===r.kid);
       if(!k){rej(c,r,'auteur ou clé inconnus');continue}
+      if(!keyOK(k,r)){rej(c,r,'appareil révoqué');continue}
       if(!await verifySig(r,k)){rej(c,r,'signature invalide : fichier modifié');continue}
       const err=canWrite(u,c,r,old?JSON.parse(JSON.stringify(old)):null);
       if(err){rej(c,r,err);continue}
@@ -518,7 +528,7 @@ function render(){
   if(!D){document.body.classList.add('locked');$('#app').innerHTML=HDR?lockScreen():setupScreen();return}
   document.body.classList.remove('locked');
   $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.go===view));
-  $('#who').textContent=(meU()?.nom||'?').split(' ')[0]+' · '+role();
+  $('#who').textContent=(meU()?.nom||'?').split(' ')[0]+' · '+roleName(role());
   $('#sttl').textContent=D.settings.nom+' · '+EX()+' · tenue en '+BASE();
   const V={accueil,saisir,factures,stocks,paie,etats,reglages};
   $('#app').innerHTML=(V[view]||accueil)();
@@ -684,6 +694,7 @@ async function joinStart(text){JOIN={text};openSheet(`<h2>Rejoindre l'entreprise
   <div class="btns"><button class="pr" type="submit">Vérifier et rejoindre</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
 async function joinFinish(F){
   if(F.pin!==F.pin2)throw new Error('Les deux PIN sont différents');if(!/^\d{6,}$/.test(F.pin))throw new Error('Le PIN doit avoir au moins 6 chiffres');
+  toast('Vérification du fichier et des signatures… patientez');
   const {f,p}=await unpackFile(JOIN.text,F.pass);if(f.kind!=='invite'||!p.invite)throw new Error('Ce fichier n\'est pas une invitation');
   const inv=p.invite;let pj;
   try{pj=JSON.parse(dec.decode(await aesD(await kdf(F.tmp,b64d(inv.salt)),inv.p)))}catch(e){throw new Error('PIN provisoire incorrect')}
@@ -731,7 +742,7 @@ function alertes(){
   return a;
 }
 function accueil(){
-  if(!isAdmin()){const mine=live(D.entries).filter(e=>e.cr===ME&&e.st==='B');return `<h2>Bonjour ${esc(meU().nom.split(' ')[0])}</h2><p class="muted">Rôle Saisie : vos opérations sont validées par le gérant ou le comptable.</p><div class="btns"><button class="pr" data-act="quick" data-k="vente">+ Recette</button><button class="pr" data-act="quick" data-k="depense">+ Dépense</button><button data-act="doc" data-k="D">+ Devis</button></div><h3>Mes brouillons en attente (${mine.length})</h3>${mine.map(entryCard).join('')||'<p class="muted">Aucun.</p>'}`}
+  if(!perm('etats')){const mine=live(D.entries).filter(e=>e.cr===ME&&e.st==='B');return `<h2>Bonjour ${esc(meU().nom.split(' ')[0])}</h2><p class="muted">${isAdmin()?'':'Vos opérations sont validées par le gérant ou le comptable.'}</p><div class="btns"><button class="pr" data-act="quick" data-k="vente">+ Recette</button><button class="pr" data-act="quick" data-k="depense">+ Dépense</button><button data-act="doc" data-k="D">+ Devis</button></div><h3>Mes brouillons en attente (${mine.length})</h3>${mine.map(entryCard).join('')||'<p class="muted">Aucun.</p>'}`}
   const y=EX(),R=resultat(bEx(y)),fx=tresoFx(),all=bTo('9999-12-31');
   const cli=solde(all,['411']),four=solde(all,['401'],'C');
   const tB=r2(TRESO.reduce((s,[c,,cur])=>s+toBase(fx[c]||0,cur),0));
@@ -971,8 +982,8 @@ function stockOf(it,end){
   return {q:Math.round(q*1000)/1000,v:r2(v),cmup:q>0?v/q:0}});
 }
 function stocks(){
-  const seg=`<div class="seg"><button class="${sub.actif!=='I'?'on':''}" data-act="sub" data-k="actif" data-v="S">Stocks</button>${isAdmin()?`<button class="${sub.actif==='I'?'on':''}" data-act="sub" data-k="actif" data-v="I">Immobilisations</button>`:''}</div>`;
-  if(sub.actif==='I'&&isAdmin())return '<h2>Immobilisations</h2>'+seg+immoView();
+  const seg=`<div class="seg"><button class="${sub.actif!=='I'?'on':''}" data-act="sub" data-k="actif" data-v="S">Stocks</button>${perm('immo')?`<button class="${sub.actif==='I'?'on':''}" data-act="sub" data-k="actif" data-v="I">Immobilisations</button>`:''}</div>`;
+  if(sub.actif==='I'&&perm('immo'))return '<h2>Immobilisations</h2>'+seg+immoView();
   return stocks0().replace('<h2>Stocks</h2>','<h2>Stocks</h2>'+seg);
 }
 function stocks0(){
@@ -1034,7 +1045,7 @@ async function postSlip(s){
   await commit('entries',e,'comptabilisation paie',e.lib);return e.id;
 }
 function paie(){
-  if(!isAdmin())return '<h2>Paie</h2><p class="muted">La paie est réservée au gérant et au comptable.</p>';
+  if(!perm('paie'))return '<h2>Paie</h2><p class="muted">Votre rôle ne donne pas accès à la paie.</p>';
   const emps=live(D.emps).sort((a,b)=>a.nom.localeCompare(b.nom)),mois=sub.mois||today().slice(0,7);
   const sl=live(D.slips).filter(s=>s.mois===mois);
   return `<h2>Paie</h2><div class="seg"><button class="${sub.paie!=='E'?'on':''}" data-act="sub" data-k="paie" data-v="B">Bulletins</button><button class="${sub.paie==='E'?'on':''}" data-act="sub" data-k="paie" data-v="E">Employés (${emps.length})</button></div>
@@ -1084,9 +1095,9 @@ function slipHTML(s){const c=slipCalc(s),e=byId('emps',s.emp)||{},S=D.settings,[
 
 /* ============ ÉTATS ============ */
 function etats(){
-  if(!isAdmin())return '<h2>États financiers</h2><p class="muted">Réservés au gérant et au comptable.</p>';
+  if(!perm('etats'))return '<h2>États financiers</h2><p class="muted">Votre rôle ne donne pas accès aux états financiers.</p>';
   const t=sub.etat||'resultat';
-  const T={resultat:'Compte de résultat',bilan:'Bilan',balance:'Balance',journal:'Journal',gl:'Grand livre',analytique:'Par activité',tva:'TVA',immo:'Immobilisations',rappro:'Rapprochement'};
+  const T={resultat:'Compte de résultat',bilan:'Bilan',balance:'Balance',journal:'Journal',gl:'Grand livre',analytique:'Par activité',tva:'TVA',...(perm('immo')?{immo:'Immobilisations',rappro:'Rapprochement'}:{})};
   return `<h2>États financiers ${EX()}</h2>
   <div class="row2" style="max-width:420px"><label class="f">Exercice affiché<input type="number" id="yearSel" value="${EX()}" min="2000" max="2100"></label></div>
   <div class="seg">${Object.entries(T).map(([k,l])=>`<button class="${k===t?'on':''}" data-act="sub" data-k="etat" data-v="${k}">${l}</button>`).join('')}</div>
@@ -1154,8 +1165,14 @@ function reglages(){
   securite:()=>`<p>Connecté : <b>${esc(meU().nom)}</b> (${esc(role())}). Empreinte de votre clé : <span class="fp">${esc(fpr(KID))}</span></p>
     <div class="btns"><button data-act="changePin">Changer mon PIN</button><button class="ghost" data-act="lockNow">Verrouiller maintenant</button></div>
     <ul class="small muted"><li>Données chiffrées sur le téléphone (AES-256-GCM), clé protégée par votre PIN (PBKDF2, ${ITER.toLocaleString('fr-FR')} itérations).</li><li>Chaque saisie est signée avec votre clé personnelle (ECDSA P-256).</li><li>Verrouillage automatique après 5 minutes d'inactivité. Blocage progressif après 5 PIN erronés.</li><li>Les fichiers échangés sont chiffrés et authentifiés avec le code entreprise.</li></ul>`,
-  users:()=>`<table class="stack"><thead><tr><th>Nom</th><th>Rôle</th><th>Appareils</th><th></th></tr></thead><tbody>${live(D.users).map(u=>`<tr><td><b>${esc(u.nom)}</b>${u.actif===false?' <span class="tag r">Retiré</span>':''}</td><td>${esc(u.role)}</td><td>${u.keys.map(k=>esc(k.code)).join(', ')}</td><td><button class="ghost" data-act="user" data-id="${esc(u.id)}">Gérer</button></td></tr>`).join('')}</tbody></table>
+  users:()=>`<table class="stack"><thead><tr><th>Nom</th><th>Rôle</th><th>Appareils</th><th></th></tr></thead><tbody>${live(D.users).map(u=>`<tr><td><b>${esc(u.nom)}</b>${u.actif===false?' <span class="tag r">Retiré</span>':''}</td><td>${esc(roleName(u.role))}</td><td>${u.keys.filter(k=>!k.rev).map(k=>esc(k.code)).join(', ')||'—'}</td><td><button class="ghost" data-act="user" data-id="${esc(u.id)}">Gérer</button></td></tr>`).join('')}</tbody></table>
     <div class="btns"><button class="pr" data-act="user">+ Ajouter un collaborateur</button></div>
+    <h3>Rôles</h3><table class="stack"><thead><tr><th>Rôle</th><th>Droits</th><th></th></tr></thead><tbody>
+    <tr><td><b>Gérant</b></td><td class="small">Tous les droits, utilisateurs, rôles, réglages, clôtures</td><td></td></tr>
+    <tr><td><b>Comptable</b></td><td class="small">Tous les droits comptables</td><td></td></tr>
+    <tr><td><b>Saisie</b></td><td class="small">Brouillons, devis, stocks, clients et fournisseurs</td><td></td></tr>
+    ${live(D.roles).map(r=>`<tr><td><b>${esc(r.nom)}</b></td><td class="small">Brouillons et devis${PERMS.filter(([p])=>r.perms?.[p]).map(([p,l])=>' · '+esc(l.split(',')[0])).join('')}</td><td><button class="ghost" data-act="roleEdit" data-id="${esc(r.id)}">Modifier</button></td></tr>`).join('')}</tbody></table>
+    <div class="btns"><button data-act="roleEdit">+ Créer un rôle</button></div>
     <p class="small muted">Gérant : tous les droits, utilisateurs, réglages et clôtures. Comptable : valide, émet, paie, contrepasse. Saisie : crée des brouillons, des devis et des mouvements de stock. Pour donner l'accès sur un téléphone, créez une <b>invitation</b> ; donnez le code entreprise et le PIN provisoire de vive voix, jamais dans le même message que le fichier.</p>`,
   cloture:()=>{const months=[];const d=new Date();for(let i=1;i<=18;i++){const x=new Date(d.getFullYear(),d.getMonth()-i,1);const m=x.toLocaleDateString('sv-SE').slice(0,7);if(lastDay(m)>lockDate())months.push(m)}
     return `<p>Comptes clôturés jusqu'au : <b>${lockDate()?dfr(lockDate()):'aucune clôture'}</b></p>
@@ -1184,10 +1201,18 @@ function reglages(){
 }
 function userForm(id){const u=id?byId('users',id):{id:'',nom:'',role:'Saisie',actif:true,keys:[]};
   openSheet(`<h2>${id?esc(u.nom):'Nouveau collaborateur'}</h2><form id="fu" data-id="${esc(u.id)}"><label class="f">Nom<input name="nom" value="${esc(u.nom)}" required maxlength="120"></label>
-  <label class="f">Rôle<select name="role" ${id===ME?'disabled':''}>${ROLES.map(r=>`<option ${r===u.role?'selected':''}>${r}</option>`).join('')}</select></label>
+  <label class="f">Rôle<select name="role" ${id===ME?'disabled':''}>${[...ROLES.map(r=>[r,r]),...live(D.roles).map(r=>[r.id,r.nom])].map(([v,l])=>`<option value="${esc(v)}" ${v===u.role?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
   ${id&&id!==ME?`<label class="chk"><input type="checkbox" name="actif" ${u.actif!==false?'checked':''}> Accès actif (décocher pour retirer l'accès : ses futures saisies seront refusées)</label>`:''}
   <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>
+  ${id&&u.keys.length?`<h3>Appareils et invitations</h3>${u.keys.map(k=>{const used=D.log.some(l=>l.kid===k.kid),me=k.kid===KID;return `<div class="card"><div class="top"><b>Appareil ${esc(k.code)}</b>${k.rev?'<span class="tag r">Révoqué</span>':me?'<span class="tag g">Ce téléphone</span>':used?'<span class="tag g">Actif</span>':'<span class="tag y">Invitation en attente</span>'}</div><div class="small muted">Empreinte ${esc(fpr(k.kid))}${k.rev?' · révoqué le '+esc(new Date(k.rev).toLocaleString('fr-FR')):''}</div>${!k.rev&&!me?`<button class="dg" style="margin-top:8px" data-act="revokeKey" data-id="${esc(u.id)}" data-k="${esc(k.kid)}">${used?'Révoquer cet appareil':'Annuler cette invitation'}</button>`:''}</div>`}).join('')}<p class="small muted">Annuler une invitation la rend inutilisable, même si le fichier a déjà été envoyé. Révoquer un appareil bloque toutes ses saisies futures ; ce qu'il a enregistré avant reste valable.</p>`:''}
+  ${id&&id!==ME&&!D.log.some(l=>l.by===id)&&!D.entries.some(e=>e.cr===id)?`<div class="btns"><button class="dg" data-act="delUser" data-id="${esc(id)}">Supprimer ce collaborateur (créé par erreur)</button></div>`:''}
   ${id&&u.actif!==false?`<h3>Inviter sur un téléphone</h3><form id="finv" data-id="${esc(u.id)}"><label class="f">PIN provisoire (6 chiffres ou plus)<input class="pin" name="tmp" inputmode="numeric" minlength="6" required></label><button type="submit">Créer le fichier d'invitation</button></form>`:''}`)}
+function roleForm(id){const r=id?byId('roles',id):{id:'',nom:'',perms:{}};const used=id&&live(D.users).some(u=>u.role===id);
+  openSheet(`<h2>${id?'Modifier le rôle':'Nouveau rôle'}</h2><form id="frole" data-id="${esc(r.id)}"><label class="f">Nom du rôle<input name="nom" value="${esc(r.nom)}" required maxlength="40" placeholder="Chef de ferme, Magasinier, Caissier…"></label>
+  <p class="small muted">Tout rôle peut saisir des opérations en brouillon et faire des devis. Cochez les droits supplémentaires :</p>
+  ${PERMS.map(([p,l])=>`<label class="chk"><input type="checkbox" name="p_${p}" ${r.perms?.[p]?'checked':''}> ${esc(l)}</label>`).join('')}
+  <p class="small muted">Seul le gérant gère les utilisateurs, les rôles, les réglages et les clôtures.</p>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button>${id?`<button type="button" class="dg" data-act="delRole" data-id="${esc(id)}" ${used?'disabled title="Rôle attribué à un utilisateur"':''}>Supprimer</button>`:''}</div>${used?'<p class="small muted">Ce rôle est attribué : changez d\'abord le rôle des utilisateurs concernés pour pouvoir le supprimer.</p>':''}</form>`)}
 function imgToData(file,max,cb){if(!/^image\/(png|jpeg)$/.test(file.type))return toast('Image PNG ou JPEG uniquement');const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/png'))};im.src=r.result};r.readAsDataURL(file)}
 async function closePeriod(m){
   const until=lastDay(m);
@@ -1313,7 +1338,7 @@ async function srvFetch(path,opt={}){const s=SRV();if(!s)throw new Error('Serveu
   if(!r.ok){let t='';try{t=(await r.json()).message||''}catch(e){}throw new Error('Serveur '+r.status+(t?' : '+t:''))}return r}
 async function push(){
   if(!SRV()||!D||!navigator.onLine||SYNC.busy)return;SYNC.busy=true;
-  try{const payload=await packFile('sync',{D:{...D},from:meU().nom,at:NOW()},LOC.pass);
+  try{if(!LOC.tok)LOC.tok=b64e(rnd(24));const payload=await packFile('sync',{D:{...D},from:meU().nom,at:NOW()},LOC.pass);
     await srvFetch('mgc_sync?on_conflict=company,device',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({company:D.settings.cr,device:HDR.dev,payload,owner_hash:await sha(LOC.tok),updated_at:new Date().toISOString()})});
     LOC.lastPush=NOW();SYNC.err='';scheduleSave()}
   finally{SYNC.busy=false}
@@ -1396,10 +1421,14 @@ document.addEventListener('click',ev=>{
     csv:()=>exportCSV(),export:()=>exportSync(),
     changePin:()=>changePinForm(false),
     user:()=>userForm(id),
+    roleEdit:()=>roleForm(id),
+    delRole:async()=>{if(live(D.users).some(u=>u.role===id))throw new Error('Rôle encore attribué');if(!ask('Supprimer ce rôle ?'))return;const r=JSON.parse(JSON.stringify(byId('roles',id)));r.del=true;await commit('roles',r,'suppression rôle',r.nom);closeSheet();render()},
+    revokeKey:async()=>{const u=JSON.parse(JSON.stringify(byId('users',id)));const k=u.keys.find(x=>x.kid===b.dataset.k);if(!k)return;if(k.kid===KID)throw new Error('Impossible de révoquer ce téléphone');if(!ask((D.log.some(l=>l.kid===k.kid)?'Révoquer l\'appareil ':'Annuler l\'invitation ')+k.code+' de '+u.nom+' ? Cette action est définitive.'))return;k.rev=NOW();await commit('users',u,'révocation appareil',u.nom+' — appareil '+k.code);render();userForm(id);toast('Appareil '+k.code+' révoqué')},
+    delUser:async()=>{if(D.log.some(l=>l.by===id)||D.entries.some(e=>e.cr===id))throw new Error('Cet utilisateur a déjà travaillé : retirez son accès au lieu de le supprimer');if(!ask('Supprimer définitivement ce collaborateur ?'))return;const u=JSON.parse(JSON.stringify(byId('users',id)));u.del=true;u.keys=u.keys.map(k=>({...k,rev:k.rev||NOW()}));await commit('users',u,'suppression utilisateur',u.nom);closeSheet();render();toast('Collaborateur supprimé')},
     asset:()=>assetForm(),openAsset:()=>assetView(id),cession:()=>cessionForm(id),
     dotations:async()=>{if(ask('Calculer et comptabiliser les dotations aux amortissements '+EX()+' ?')){await dotations();render()}},
     saveRec:async()=>{if(ask('Valider ce rapprochement ? Il deviendra définitif.'))await saveRec()},
-    syncNow:async()=>{await push();await pull(true);render()},
+    syncNow:async()=>{let err=null;try{await pull(true)}catch(e){err=e}try{await push()}catch(e){err=err||e}render();if(err){SYNC.err=err.message;throw err}},
     srvOff:async()=>{if(!ask('Désactiver la synchronisation serveur pour toute l\'entreprise ?'))return;const s=JSON.parse(JSON.stringify(D.settings));s.syncUrl='';s.syncKey='';await commitSettings(s,'synchronisation désactivée','');render()},
     shareFile:()=>shareFile(),saveFile:()=>saveFile(),
     copySQL:()=>navigator.clipboard?.writeText(SQL).then(()=>toast('Script copié'),()=>toast('Copie impossible')),
@@ -1489,6 +1518,7 @@ document.addEventListener('submit',ev=>{
       const s=JSON.parse(JSON.stringify(D.settings));const old=[s.syncUrl,s.syncKey];s.syncUrl=url;s.syncKey=key;D.settings.syncUrl=url;D.settings.syncKey=key;
       try{await srvFetch('mgc_sync?select=device&limit=1')}catch(e){D.settings.syncUrl=old[0];D.settings.syncKey=old[1];throw new Error('Connexion impossible : '+e.message+'. Le script SQL a-t-il été exécuté ?')}
       D.settings.syncUrl=old[0];D.settings.syncKey=old[1];await commitSettings(s,'synchronisation serveur',url);await push();await pull(true);render();toast('Synchronisation activée');break}
+    case 'frole':{const id=f.dataset.id;const r=id?JSON.parse(JSON.stringify(byId('roles',id))):{id:'r_'+uid()};r.nom=F.nom.trim().slice(0,40);if(ROLES.includes(r.nom))throw new Error('Nom réservé');r.perms={};for(const [p] of PERMS)if(F['p_'+p])r.perms[p]=true;await commit('roles',r,id?'modification rôle':'nouveau rôle',r.nom);closeSheet();render();toast('Rôle enregistré');break}
     case 'fclose':{const m=F.m;if(!ask('Clôturer définitivement jusqu\'au '+dfr(lastDay(m))+' ? Cette action est irréversible.'))return;await closePeriod(m);render();toast('Période clôturée');break}
     case 'fset':{const s=JSON.parse(JSON.stringify(D.settings));for(const k of ['nom','adresse','rccm','idnat','nif','tel','email','mentions'])s[k]=(F[k]||'').slice(0,500);for(const k of ['taux','tva','cnssSal','cnssPat','inpp','onem'])s[k]=Math.max(0,+F[k]||0);if(!(s.taux>0))throw new Error('Taux invalide');s.tvaDefaut=!!F.tvaDefaut;await commitSettings(s,'réglages','');render();toast('Réglages enregistrés');break}
   }});
