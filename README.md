@@ -1,1 +1,1 @@
-# mupglobal-compta.
+# mupglobal-compta
