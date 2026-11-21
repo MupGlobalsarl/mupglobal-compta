@@ -239,7 +239,7 @@ const TR=c=>TRESO.find(t=>t[0]===c);
 const isTreso=c=>!!TR(c);
 const JR={CA:'Caisse',BQ:'Banque',MM:'Mobile money',AC:'Achats',VE:'Ventes',PA:'Paie',OD:'Opérations diverses',AN:'À-nouveaux'};
 const STK={'311':{l:'Marchandises',ach:'601',v:'6031'},'321':{l:'Matières premières',ach:'602',v:'6032'},'331':{l:'Fournitures consommables',ach:'604',v:'6033'},'361':{l:'Produits finis',ach:null,v:'736'}};
-const COLL=['users','roles','accounts','acts','tiers','items','emps','docs','entries','pays','slips','moves','assets','recs','projects','tasks','parcels','cycles','farmops','bandes','pouops','log'];
+const COLL=['users','roles','accounts','acts','tiers','items','emps','docs','entries','pays','slips','moves','assets','recs','projects','tasks','parcels','cycles','farmops','bandes','pouops','chops','log'];
 const ROLES=['Gérant','Comptable','Saisie'];
 
 /* ============ ÉTAT ============ */
@@ -253,7 +253,7 @@ const live=a=>a.filter(x=>!x.del);
 const byId=(c,id)=>id?D[c].find(x=>x.id===id):undefined;
 const meU=()=>byId('users',ME);
 const role=()=>meU()?.role||'Saisie';
-const PERMS=[['valider','Valider les écritures, émettre factures et avoirs, encaisser, contrepasser'],['etats','Voir le tableau de bord et les états financiers'],['paie','Gérer les employés et la paie'],['stocks','Gérer les stocks (articles et mouvements)'],['immo','Immobilisations et rapprochement bancaire'],['tiers','Créer et modifier clients et fournisseurs'],['projets','Créer et piloter les projets et les tâches'],['ferme','Ferme maraîchère : parcelles, campagnes, opérations'],['poulets','Poulets de chair : bandes et registre d\'élevage']];
+const PERMS=[['valider','Valider les écritures, émettre factures et avoirs, encaisser, contrepasser'],['etats','Voir le tableau de bord et les états financiers'],['paie','Gérer les employés et la paie'],['stocks','Gérer les stocks (articles et mouvements)'],['immo','Immobilisations et rapprochement bancaire'],['tiers','Créer et modifier clients et fournisseurs'],['projets','Créer et piloter les projets et les tâches'],['ferme','Ferme maraîchère : parcelles, campagnes, opérations'],['poulets','Poulets de chair : bandes et registre d\'élevage'],['chantiers','Électricité et solaire : chantiers, matériel, main-d\'œuvre']];
 const BUILTIN={'Gérant':null,'Comptable':null,'Saisie':['stocks','tiers','ferme','poulets']};
 function perm(p,u){u=u||meU();if(!u)return false;const r=u.role;if(r==='Gérant'||r==='Comptable')return true;if(r==='Saisie')return BUILTIN.Saisie.includes(p);const ro=D.roles&&D.roles.find(x=>x.id===r&&!x.del);return !!(ro&&ro.perms&&ro.perms[p])}
 const roleName=r=>BUILTIN[r]!==undefined?r:((D.roles||[]).find(x=>x.id===r)||{}).nom||'Rôle supprimé';
@@ -344,7 +344,7 @@ function canWrite(u,c,r,old){
       else if(r.st!=='B'&&lockedFor(dt,r.upd))return 'période clôturée';
       break;
     case 'moves':
-      if(!perm('stocks',u))return 'droit « stocks » requis';
+      if(!perm('stocks',u)&&!(r.proj&&r.type==='S'&&perm('chantiers',u)))return 'droit « stocks » requis';
       if(old){if(!(old.st==='V'&&r.st==='X'&&sameExcept(old,r,['st','rev'])))return 'mouvement intangible'}
       else if(lockedFor(dt,r.upd))return 'période clôturée';
       if(!adm&&r.entryId)return 'écriture d\'achat réservée au gérant ou au comptable';
@@ -355,8 +355,9 @@ function canWrite(u,c,r,old){
       if(old&&!(r.st==='V'?sameExcept(old,r,['nom','act']):(r.st==='C'&&sameExcept(old,r,['st','cession']))))return 'immobilisation : seuls le nom, l\'activité ou la cession peuvent changer';
       if(!(+r.cout>0)||!(+r.duree>=0)||!/^2[0-7]/.test(r.compte||''))return 'immobilisation invalide';
       break;
-    case 'projects':if(!perm('projets',u))return 'droit « projets » requis';break;
-    case 'tasks':if(perm('projets',u))break;if(old&&old.resp===u.id&&sameExcept(old,r,['av','note']))break;return 'droit « projets » requis (ou tâche qui vous est attribuée)';
+    case 'projects':if(!(perm('projets',u)||(r.kind==='chantier'&&perm('chantiers',u))))return r.kind==='chantier'?'droit « chantiers » requis':'droit « projets » requis';break;
+    case 'chops':if(!perm('chantiers',u))return 'droit « chantiers » requis';if(old&&!adm&&!own)return 'modification réservée à son auteur';break;
+    case 'tasks':if(perm('projets',u))break;{const pr=D.projects.find(x=>x.id===r.projet);if(pr&&pr.kind==='chantier'&&perm('chantiers',u))break}if(old&&old.resp===u.id&&sameExcept(old,r,['av','note']))break;return 'droit « projets » requis (ou tâche qui vous est attribuée)';
     case 'parcels':case 'cycles':if(!perm('ferme',u))return 'droit « ferme » requis';break;
     case 'farmops':if(!perm('ferme',u))return 'droit « ferme » requis';if(old&&!adm&&!own)return 'modification réservée à son auteur';break;
     case 'bandes':if(!perm('poulets',u))return 'droit « poulets » requis';break;
@@ -439,7 +440,7 @@ function validRec(c,r){
   if(['entries','pays','moves'].includes(c)&&!RX.date.test(r.date||''))return false;
   if(c==='docs'&&!RX.date.test(r.date||''))return false;
   if(c==='slips'&&!RX.mois.test(r.mois||''))return false;
-  if((c==='assets'||c==='recs'||c==='farmops'||c==='bandes'||c==='pouops')&&!RX.date.test(r.date||''))return false;
+  if((c==='assets'||c==='recs'||c==='farmops'||c==='bandes'||c==='pouops'||c==='chops')&&!RX.date.test(r.date||''))return false;
   if((c==='tasks'||c==='projects')&&!(RX.date.test(r.debut||'')&&RX.date.test(r.fin||'')))return false;
   if(c==='cycles'&&!RX.date.test(r.semis||''))return false;
   if(c==='recs'&&!Array.isArray(r.points))return false;
@@ -921,7 +922,7 @@ function docForm(type,id,opt={}){
   if(id)d=JSON.parse(JSON.stringify(byId('docs',id)));
   else if(opt.fromDevis){const s=byId('docs',opt.fromDevis);d={...JSON.parse(JSON.stringify(s)),id:'',type:'F',num:'',st:'B',date:today(),ech:addDays(today(),30),from:s.id,conv:false};for(const k of ['cr','by','kid','ver','upd','dev','sig','entryId'])delete d[k]}
   else if(opt.avoirOf){const s=byId('docs',opt.avoirOf);d={id:'',type:'A',of:s.id,num:'',st:'B',date:today(),ech:'',client:s.client,act:s.act,acc:s.acc,tva:s.tva,tvaRate:s.tvaRate,cur:s.cur,rate:s.rate,lignes:JSON.parse(JSON.stringify(s.lignes)),notes:'Avoir sur facture '+s.num}}
-  else d={id:'',type,num:type==='D'?nextNum('DV'):'',st:'B',date:today(),ech:addDays(today(),30),client:'',act:UI.lastAct||'act0',acc:'706',tva:D.settings.tvaDefaut,tvaRate:D.settings.tva,cur:lastCur(),rate:RATE(),lignes:[{des:'',q:1,pu:0}],notes:''};
+  else d={id:'',type,num:type==='D'?nextNum('DV'):'',st:'B',date:today(),ech:addDays(today(),30),client:opt.client||'',proj:opt.proj||'',act:UI.lastAct||'act0',acc:'706',tva:D.settings.tvaDefaut,tvaRate:D.settings.tva,cur:lastCur(),rate:RATE(),lignes:[{des:'',q:1,pu:0}],notes:''};
   docDraft=d;const A=d.type==='A';
   openSheet(`<h2>${A?'Avoir sur facture '+esc(byId('docs',d.of).num):(d.id?'Modifier ':'Nouveau ')+(d.type==='F'?'brouillon de facture':'devis '+esc(d.num))}</h2><form id="fd">
   ${A?`<p class="small muted">Réduisez les quantités ou les prix aux montants à annuler. Maximum : ${money(r2(docTot(byId('docs',d.of)).ttc-docAvoirs(byId('docs',d.of))),d.cur)}.</p>`:`<label class="f">Client<select name="client" data-tt="C" required>${optTiers('C',d.client)}</select></label>`}
@@ -1266,6 +1267,7 @@ function pilotage(){
   return `<div class="agrid">
   <div class="acard" data-go="activites" data-sub3="ferme"><h4>Ferme maraîchère</h4><div class="kpi" style="border:0;padding:0"><div class="v">${fmtQ(kg)} kg</div><div class="l">récoltés · ${cyc.length} campagne(s) en cours</div></div></div>
   ${(()=>{let ef=0,m=0,i=0;for(const b of live(D.bandes)){const s=bandeStats(b);if(b.statut!=='Clôturée')ef+=s.eff;m+=s.mort;i+=s.init}return `<div class="acard" data-go="activites" data-sub3="poulets"><h4>Poulets de chair</h4><div class="kpi" style="border:0;padding:0"><div class="v">${fmtQ(ef)} sujets</div><div class="l ${i&&m/i>0.05?'neg':''}">mortalité ${i?fmt(m/i*100):'0,00'} %</div></div></div>`})()}
+  ${(()=>{const cs=live(D.projects).filter(p=>p.kind==='chantier');const act=cs.filter(p=>['Accepté','En cours','Réceptionné'].includes(p.statut));const car=act.reduce((s,p)=>s+Math.max(0,(+p.montant||0)-chStats(p).facture),0);return `<div class="acard" data-go="activites" data-sub3="elec"><h4>Électricité & solaire</h4><div class="kpi" style="border:0;padding:0"><div class="v">${act.length} chantier(s)</div><div class="l">carnet ${money(car)}</div></div></div>`})()}
   <div class="acard" data-go="projets"><h4>Projets</h4><div class="kpi" style="border:0;padding:0"><div class="v">${projs.length} actif(s)</div><div class="l ${plate?'neg':''}">${plate?plate+' en retard':'aucun retard'}</div></div></div>
   <div class="acard" data-go="projets" data-sub2="mine"><h4>Mes tâches</h4><div class="kpi" style="border:0;padding:0"><div class="v">${my.length} ouverte(s)</div><div class="l ${late?'neg':''}">${late?late+' en retard':'à jour'}</div></div></div>
   </div>`;
@@ -1291,9 +1293,9 @@ function cycleStats(c){
 function weekKey(d){const x=new Date(d+'T12:00:00');const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);return x.toLocaleDateString('sv-SE')}
 function activites(){
   const a=sub.act||'ferme';
-  const tabs=[['ferme','Ferme maraîchère',1],['poulets','Poulets de chair',1],['elec','Électricité & solaire',0],['couture','Couture & peinture',0]];
+  const tabs=[['ferme','Ferme maraîchère',1],['poulets','Poulets de chair',1],['elec','Électricité & solaire',1],['couture','Couture & peinture',0]];
   return `<h2>Activités</h2><div class="seg">${tabs.map(([k,l,on])=>`<button class="${a===k?'on':''} ${on?'':'soon'}" data-act="sub" data-k="act" data-v="${k}">${l}</button>`).join('')}</div>
-  ${a==='ferme'?fermeView():a==='poulets'?poulView():`<div class="card"><b>${esc(tabs.find(x=>x[0]===a)[1])}</b><p class="muted">Ce module arrive dans une prochaine étape. En attendant, ses opérations se saisissent dans « Saisir » avec l'activité correspondante, et sa rentabilité apparaît dans les états.</p></div>`}`;
+  ${a==='ferme'?fermeView():a==='poulets'?poulView():a==='elec'?elecView():`<div class="card"><b>${esc(tabs.find(x=>x[0]===a)[1])}</b><p class="muted">Ce module arrive dans une prochaine étape. En attendant, ses opérations se saisissent dans « Saisir » avec l'activité correspondante, et sa rentabilité apparaît dans les états.</p></div>`}`;
 }
 function fermeView(){
   const ps=live(D.parcels),cs=live(D.cycles).sort((x,y)=>y.semis.localeCompare(x.semis)),can=perm('ferme');
@@ -1473,6 +1475,106 @@ async function saveBande(f,F){
   await commit('bandes',b,id?'modification bande':'nouvelle bande',b.nom);closeSheet();render();bandeView(b.id);
 }
 
+/* ============ ACTIVITÉS : ÉLECTRICITÉ & SOLAIRE (CHANTIERS) ============ */
+const CHSTAT=['Prospect','Devis envoyé','Accepté','En cours','Réceptionné','Facturé','Clôturé'];
+const CHTYPE=['Installation solaire','Électricité bâtiment','Électricité industrielle','Pompage solaire','Maintenance, dépannage'];
+const CHOPS={MO:'Main-d\'œuvre',MAT:'Matériel acheté pour le chantier',DEP:'Autre dépense (transport, location…)'};
+const CHACC={MO:'661',MAT:'604',DEP:'638'};
+/* Modèles de tâches : [nom, part de la durée totale] */
+const CHTPL={
+  'Installation solaire':[['Visite technique et relevés',.08],['Dimensionnement et devis',.08],['Approvisionnement du matériel',.2],['Pose des structures et des panneaux',.22],['Câblage, protections, onduleur et batteries',.2],['Mise en service et essais',.12],['Réception et formation du client',.1,1]],
+  'Électricité bâtiment':[['Visite et métré',.1],['Devis et commande',.15],['Saignées, gaines et boîtiers',.25],['Tirage des câbles',.2],['Tableau et appareillage',.15],['Essais et contrôle',.1],['Réception',.05,1]],
+  'Électricité industrielle':[['Étude et schémas',.15],['Approvisionnement',.2],['Chemins de câbles et tirage',.25],['Armoires et raccordements',.2],['Essais et mise en service',.15],['Réception',.05,1]],
+  'Pompage solaire':[['Étude du forage et dimensionnement',.15],['Approvisionnement',.2],['Installation de la pompe et du champ solaire',.35],['Raccordements et essais',.2],['Réception',.1,1]],
+  'Maintenance, dépannage':[['Diagnostic',.3],['Intervention',.5],['Essais et rapport',.2,1]]
+};
+function elecAct(){return (live(D.acts).find(a=>/électr|solaire/i.test(a.nom))||live(D.acts)[0]||{}).id}
+let MCOST={v:-1,m:{}};
+function moveCosts(){if(MCOST.v===VER)return MCOST.m;const m={};
+  for(const it of live(D.items)){let q=0,v=0;for(const mv of live(D.moves).filter(x=>x.item===it.id&&x.st!=='X').sort((a,b)=>a.date.localeCompare(b.date)||a.upd-b.upd)){const n=+mv.q||0;
+    if(mv.type==='E'){v+=n*(+mv.pu||0);q+=n}else if(mv.type==='S'){const c=q>0?v/q:0;m[mv.id]=r2(c*n);v-=c*n;q-=n}else if(mv.type==='I'){if(q>0)v=v/q*n;else v=n*(+mv.pu||0);q=n}}}
+  MCOST={v:VER,m};return m}
+function chStats(p){
+  const docs=live(D.docs).filter(d=>d.proj===p.id),fac=docs.filter(d=>d.type==='F'&&d.st==='E'),av=docs.filter(d=>d.type==='A'&&d.st==='E');
+  const ht=d=>toBase(docTot(d).ht,d.cur,d.rate);
+  const facture=r2(fac.reduce((s,d)=>s+ht(d),0)-av.reduce((s,d)=>s+ht(d),0));
+  const encaisse=r2(live(D.pays).filter(x=>x.st==='V'&&fac.some(d=>d.id===x.doc)).reduce((s,x)=>s+toBase(x.mt,x.cur,x.rate),0));
+  const mc=moveCosts(),mats=live(D.moves).filter(m=>m.proj===p.id&&m.type==='S'&&m.st!=='X');
+  const cStock=r2(mats.reduce((s,m)=>s+(mc[m.id]||0),0));
+  const ops=live(D.chops).filter(o=>o.proj===p.id);let mo=0,mat=0,dep=0,jours=0;
+  for(const o of ops){if(o.type==='MO'){mo+=+o.cout||0;jours+=(+o.jours||0)*(+o.nb||1)}else if(o.type==='MAT')mat+=+o.cout||0;else dep+=+o.cout||0}
+  const cost=r2(cStock+mo+mat+dep),base=facture||+p.montant||0;
+  return {docs,facture,encaisse,mats,cStock,ops,mo:r2(mo),mat:r2(mat),dep:r2(dep),jours,cost,marge:r2(base-cost),tx:base?(base-cost)/base*100:0,devis:docs.filter(d=>d.type==='D')};
+}
+function elecView(){
+  const cs=live(D.projects).filter(p=>p.kind==='chantier'),v=sub.chv||'pipe',can=perm('chantiers')||perm('projets');
+  const open=cs.filter(p=>!['Clôturé','Prospect'].includes(p.statut)),carnet=r2(cs.filter(p=>['Accepté','En cours','Réceptionné'].includes(p.statut)).reduce((s,p)=>s+Math.max(0,(+p.montant||0)-chStats(p).facture),0));
+  let fact=0,cost=0;for(const p of cs){const s=chStats(p);fact+=s.facture;cost+=s.cost}
+  const pros=cs.filter(p=>['Prospect','Devis envoyé'].includes(p.statut)).reduce((s,p)=>s+(+p.montant||0),0),won=cs.filter(p=>!['Prospect','Devis envoyé'].includes(p.statut)).length,sent=cs.filter(p=>p.statut!=='Prospect').length;
+  const head=`<div class="kpis"><div class="kpi"><div class="l">Chantiers actifs</div><div class="v">${open.length}</div></div><div class="kpi"><div class="l">Carnet de commandes</div><div class="v">${money(carnet)}</div></div>
+  <div class="kpi"><div class="l">Devis en attente</div><div class="v">${money(pros)}</div></div><div class="kpi"><div class="l">Taux de transformation</div><div class="v">${sent?Math.round(won/sent*100):0} %</div></div>
+  <div class="kpi"><div class="l">Facturé (HT)</div><div class="v">${money(fact)}</div></div><div class="kpi"><div class="l">Marge des chantiers</div><div class="v ${fact-cost<0?'neg':''}">${money(fact-cost)}</div></div></div>
+  ${can?'<div class="btns"><button class="pr" data-act="chantier">+ Nouveau chantier</button></div>':''}
+  <div class="seg"><button class="${v==='pipe'?'on':''}" data-act="sub" data-k="chv" data-v="pipe">Pipeline</button><button class="${v==='list'?'on':''}" data-act="sub" data-k="chv" data-v="list">Rentabilité</button><button class="${v==='gantt'?'on':''}" data-act="sub" data-k="chv" data-v="gantt">Planning</button></div>`;
+  if(!cs.length)return head+'<p class="empty">Créez votre premier chantier : client, type de travaux, montant du marché. Les tâches types (visite, devis, pose, mise en service, réception) sont proposées automatiquement.</p>';
+  if(v==='gantt')return head+zoomSeg()+gantt(cs.filter(p=>p.statut!=='Clôturé').map(p=>{const s=projStats(p);return {id:p.id,label:p.nom,sub:tiersNom(p.client)||p.ctype||'',debut:p.debut,fin:p.fin,av:s.av,late:s.late>0||(p.fin<today()&&!['Réceptionné','Facturé','Clôturé'].includes(p.statut)),act:'openProj'}}),UI.gz||'S');
+  if(v==='list')return head+`<div class="scroll"><table><thead><tr><th>Chantier</th><th class="n">Marché</th><th class="n">Facturé</th><th class="n">Coûts</th><th class="n">Marge</th><th class="n">%</th></tr></thead><tbody>${cs.map(p=>{const s=chStats(p);return `<tr data-act="openProj" data-id="${esc(p.id)}" style="cursor:pointer"><td><b>${esc(p.nom)}</b><br><span class="small muted">${esc(p.statut)}</span></td><td class="n">${fmt(p.montant)}</td><td class="n">${fmt(s.facture)}</td><td class="n">${fmt(s.cost)}</td><td class="n ${s.marge<0?'neg':''}">${fmt(s.marge)}</td><td class="n">${Math.round(s.tx)}</td></tr>`}).join('')}</tbody></table></div><p class="small muted">Marge = facturé HT (ou montant du marché tant que rien n'est facturé) − coûts : matériel sorti du stock au coût moyen, matériel acheté, main-d'œuvre et dépenses du chantier.</p>`;
+  return head+`<div class="scroll" style="display:flex;gap:10px;padding-bottom:8px;align-items:flex-start">${CHSTAT.map(st=>{const l=cs.filter(p=>p.statut===st);return `<div style="flex:none;width:230px;background:var(--pn);border:1px solid var(--ln);border-radius:4px;padding:8px"><div class="top" style="display:flex;justify-content:space-between;font-weight:800;font-size:14px;margin-bottom:6px"><span>${st}</span><span class="muted">${l.length}</span></div><div class="small muted" style="margin-bottom:6px">${money(l.reduce((s,p)=>s+(+p.montant||0),0))}</div>
+    ${l.map(p=>{const s=projStats(p);return `<div class="card" data-act="openProj" data-id="${esc(p.id)}" style="cursor:pointer;background:var(--bg);margin-bottom:6px"><b style="font-size:14px">${esc(p.nom)}</b><div class="small muted">${esc(tiersNom(p.client))} · ${money(p.montant)}</div><div class="small muted">${dfr(p.debut)} → ${dfr(p.fin)}</div><div class="prog" style="margin-top:6px"><i style="width:${s.av}%"></i></div></div>`}).join('')||'<div class="small muted">—</div>'}</div>`}).join('')}</div><p class="small muted">Faites glisser horizontalement pour voir toutes les étapes. Touchez un chantier pour l'ouvrir et le faire avancer.</p>`;
+}
+function chantierForm(id){const p=id?byId('projects',id):{id:'',nom:'',client:'',ctype:'Installation solaire',adresse:'',kwc:'',debut:today(),fin:addDays(today(),21),montant:0,statut:'Prospect',resp:ME,desc:''};
+  openSheet(`<h2>${id?'Modifier le chantier':'Nouveau chantier'}</h2><form id="fchant" data-id="${esc(p.id)}">
+  <label class="f">Nom du chantier<input name="nom" value="${esc(p.nom)}" required maxlength="100" placeholder="Solaire 5 kWc — Clinique Espoir"></label>
+  <div class="row2"><label class="f">Client<select name="client" data-tt="C" required>${optTiers('C',p.client)}</select></label><label class="f">Type de travaux<select name="ctype">${CHTYPE.map(x=>`<option ${x===p.ctype?'selected':''}>${x}</option>`).join('')}</select></label></div>
+  <div class="row2"><label class="f">Adresse du chantier<input name="adresse" value="${esc(p.adresse)}" maxlength="150"></label><label class="f">Puissance (kWc, si solaire)<input type="number" name="kwc" step="0.1" min="0" value="${esc(p.kwc||'')}"></label></div>
+  <div class="row2"><label class="f">Début prévu<input type="date" name="debut" value="${esc(p.debut)}" required></label><label class="f">Fin prévue<input type="date" name="fin" value="${esc(p.fin)}" required></label></div>
+  <div class="row2"><label class="f">Montant du marché HT (${BASE()})<input type="number" name="montant" step="0.01" min="0" value="${esc(p.montant||'')}"></label><label class="f">Étape<select name="statut">${CHSTAT.map(x=>`<option ${x===p.statut?'selected':''}>${x}</option>`).join('')}</select></label></div>
+  <label class="f">Chef de chantier<select name="resp">${optUsers(p.resp)}</select></label>
+  ${!id?'<label class="chk"><input type="checkbox" name="tpl" checked> Créer les tâches types de ce genre de chantier (planning de départ modifiable)</label>':''}
+  <label class="f">Notes techniques<textarea name="desc" maxlength="800">${esc(p.desc)}</textarea></label>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button>${id?`<button type="button" class="dg" data-act="delProj" data-id="${esc(id)}">Supprimer</button>`:''}</div></form>`)}
+async function saveChantier(f,F){
+  if(F.fin<F.debut)throw new Error('La fin est avant le début');if(!F.client||F.client==='__new')throw new Error('Choisissez le client');
+  const id=f.dataset.id,p=id?JSON.parse(JSON.stringify(byId('projects',id))):{id:uid(),kind:'chantier',act:elecAct(),budget:0};
+  Object.assign(p,{nom:F.nom.slice(0,100),client:F.client,ctype:F.ctype,adresse:(F.adresse||'').slice(0,150),kwc:Math.max(0,+F.kwc||0),debut:F.debut,fin:F.fin,montant:r2(Math.max(0,+F.montant||0)),statut:F.statut,resp:F.resp,desc:(F.desc||'').slice(0,800)});
+  await commit('projects',p,id?'modification chantier':'nouveau chantier',p.nom);
+  if(!id&&F.tpl){const tpl=CHTPL[p.ctype]||[],n=dd(p.debut,p.fin)+1;let cur=0,prev='';
+    for(const [nom,part,ms] of tpl){const len=Math.max(1,Math.round(n*part)),deb=addDays(p.debut,Math.min(n-1,cur)),fin=ms?p.fin:addDays(p.debut,Math.min(n-1,cur+len-1));
+      const t={id:uid(),projet:p.id,nom,resp:p.resp,debut:ms?p.fin:deb,fin,av:0,dep:prev,jalon:!!ms,note:''};await commit('tasks',t,'tâche type',nom,{noAudit:true});prev=t.id;cur+=len}}
+  closeSheet();sub.pid=p.id;go('projet');
+}
+function chantierBlock(p){
+  const s=chStats(p),can=perm('chantiers')||perm('projets'),i=CHSTAT.indexOf(p.statut),next=CHSTAT[i+1];
+  return `<div class="card" style="background:var(--pn)"><div class="top"><b>Étape : ${esc(p.statut)}</b>${can&&next?`<button class="pr" data-act="chNext" data-id="${esc(p.id)}">Passer à « ${esc(next)} »</button>`:''}</div>
+   <div style="display:flex;gap:3px;margin-top:10px">${CHSTAT.map((x,j)=>`<div title="${x}" style="flex:1;height:6px;border-radius:2px;background:${j<=i?'var(--ink)':'var(--ln)'}"></div>`).join('')}</div>
+   <div class="small muted" style="margin-top:6px">${esc(p.ctype||'')}${p.kwc?' · '+fmt(p.kwc)+' kWc':''}${p.adresse?' · '+esc(p.adresse):''} · client <b>${esc(tiersNom(p.client))}</b></div></div>
+  <div class="kpis"><div class="kpi"><div class="l">Marché HT</div><div class="v">${money(p.montant)}</div></div><div class="kpi"><div class="l">Facturé HT</div><div class="v">${money(s.facture)}</div></div>
+  <div class="kpi"><div class="l">Encaissé</div><div class="v">${money(s.encaisse)}</div></div><div class="kpi"><div class="l">Coûts</div><div class="v">${money(s.cost)}</div></div>
+  <div class="kpi"><div class="l">Marge</div><div class="v ${s.marge<0?'neg':''}">${money(s.marge)}</div></div><div class="kpi"><div class="l">Taux de marge</div><div class="v">${Math.round(s.tx)} %</div></div></div>
+  <div class="bars">${[['Matériel du stock',s.cStock],['Matériel acheté',s.mat],['Main-d\'œuvre ('+fmtQ(s.jours)+' j-h)',s.mo],['Autres dépenses',s.dep]].map(([l,v])=>`<div class="row" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 110px"><div>${l}</div><div class="tr"><div class="b p" style="width:${W(v,Math.max(1,s.cost))}"></div></div><div class="n">${money(v)}</div></div>`).join('')}</div>
+  ${can?`<div class="btns" style="margin-top:12px"><button data-act="chDevis" data-id="${esc(p.id)}">+ Devis</button><button data-act="chop" data-k="MO" data-id="${esc(p.id)}">+ Main-d'œuvre</button><button data-act="chop" data-k="MAT" data-id="${esc(p.id)}">+ Matériel acheté</button><button data-act="chMat" data-id="${esc(p.id)}">+ Sortie de stock</button><button class="ghost" data-act="chop" data-k="DEP" data-id="${esc(p.id)}">+ Dépense</button><button class="ghost" data-act="chantier" data-id="${esc(p.id)}">Modifier</button></div>`:''}
+  <h3>Devis et factures</h3>${s.docs.length?s.docs.map(d=>{const st=docStatus(d);return `<div class="card" data-act="openDoc" data-id="${esc(d.id)}" style="cursor:pointer"><div class="top"><span><b>${d.type==='D'?'Devis':d.type==='A'?'Avoir':'Facture'} ${esc(d.num||'(brouillon)')}</b> · ${dfr(d.date)}</span><span class="amt">${money(docTot(d).ttc,d.cur)}</span></div><span class="tag ${st[0]}">${st[1]}</span></div>`}).join(''):'<p class="muted">Aucun document. Faites le devis depuis ce chantier : il y sera rattaché, ainsi que la facture qui en sortira.</p>'}
+  <h3>Matériel et dépenses</h3>${[...s.mats.map(m=>({d:m.date,t:'Stock',l:fmtQ(m.q)+' '+((byId('items',m.item)||{}).unite||'')+' '+((byId('items',m.item)||{}).nom||''),v:moveCosts()[m.id]||0})),...s.ops.map(o=>({d:o.date,t:CHOPS[o.type],l:o.lib+(o.type==='MO'?` · ${fmtQ(o.nb)} pers. × ${fmtQ(o.jours)} j`:''),v:o.cout,id:o.id,cr:o.cr}))].sort((a,b)=>b.d.localeCompare(a.d)).map(x=>`<div class="card"><div class="top"><span><b>${esc(x.t)}</b> · ${dfr(x.d)}</span><span class="amt">${money(x.v)}</span></div><div class="small muted">${esc(x.l)}</div>${x.id&&(isAdmin()||x.cr===ME)?`<button class="dg" style="margin-top:6px" data-act="delChop" data-id="${esc(x.id)}">Supprimer</button>`:''}</div>`).join('')||'<p class="muted">Rien pour l\'instant.</p>'}`;
+}
+function chopForm(type,pid){const p=byId('projects',pid);
+  openSheet(`<h2>${esc(CHOPS[type])}</h2><p class="small muted">${esc(p.nom)}</p><form id="fchop" data-k="${type}" data-p="${esc(pid)}">
+  <div class="row2"><label class="f">Date<input type="date" name="date" value="${today()}" required></label><label class="f">${type==='MO'?'Équipe ou noms':'Libellé'}<input name="lib" required maxlength="120" placeholder="${type==='MO'?'Équipe pose : Jean, Patrick':type==='MAT'?'Câble 6 mm² 100 m, disjoncteurs':'Transport camion'}"></label></div>
+  ${type==='MO'?`<div class="row2"><label class="f">Nombre de personnes<input type="number" name="nb" step="1" min="1" value="2" required></label><label class="f">Nombre de jours<input type="number" name="jours" step="0.5" min="0.5" value="1" required></label></div><label class="f">Taux journalier par personne (${BASE()})<input type="number" name="taux" step="0.01" min="0" required inputmode="decimal"></label>`:`<label class="f">Montant (${BASE()})<input type="number" name="cout" step="0.01" min="0.01" required inputmode="decimal"></label>`}
+  <label class="f">Enregistrer aussi en comptabilité<select name="pay"><option value="">Non (déjà saisi, ou personnel salarié déjà en paie)</option>${TRESO.filter(t=>t[2]===BASE()).map(([c,l])=>`<option value="${c}">Oui — payé par ${l}</option>`).join('')}</select></label>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveChop(f,F){
+  const type=f.dataset.k,p=byId('projects',f.dataset.p);const o={id:uid(),proj:p.id,type,date:F.date,lib:F.lib.slice(0,120),nb:Math.max(1,+F.nb||1),jours:Math.max(0,+F.jours||0),taux:r2(+F.taux||0),cout:0};
+  o.cout=type==='MO'?r2(o.nb*o.jours*o.taux):r2(Math.max(0,+F.cout||0));if(!(o.cout>0))throw new Error('Montant nul');
+  if(F.pay){const cur=TR(F.pay)[2],e={id:uid(),date:o.date,jr:TR(F.pay)[3],piece:'CH',lib:(CHOPS[type]+' — '+p.nom+' — '+o.lib).slice(0,200),act:p.act,proj:p.id,lines:[{c:CHACC[type],d:o.cout,k:0,t:''},{c:F.pay,d:0,k:o.cout,t:'',fx:{cur,a:o.cout}}],src:{type:'chantier',ref:o.id},st:isAdmin()?'V':'B'};await commit('entries',e,e.st==='V'?'saisie validée':'brouillon',e.lib);o.entryId=e.id}
+  await commit('chops',o,'chantier',CHOPS[type]+' '+p.nom);closeSheet();render();toast('Enregistré');
+}
+function chMatForm(pid){const its=live(D.items).filter(i=>i.actif!==false&&stockOf(i).q>0);if(!its.length)return toast('Aucun article en stock');
+  openSheet(`<h2>Sortie de stock vers le chantier</h2><p class="small muted">${esc(byId('projects',pid).nom)}</p><form id="fchmat" data-p="${esc(pid)}">
+  <label class="f">Article<select name="item">${its.map(i=>`<option value="${esc(i.id)}">${esc(i.nom)} (${fmtQ(stockOf(i).q)} ${esc(i.unite)} · ${money(stockOf(i).cmup)}/${esc(i.unite)})</option>`).join('')}</select></label>
+  <div class="row2"><label class="f">Quantité<input type="number" name="q" step="any" min="0" required inputmode="decimal"></label><label class="f">Date<input type="date" name="date" value="${today()}" required></label></div>
+  <p class="small muted">Le matériel est valorisé au coût moyen pondéré et imputé au chantier.</p>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+
 /* ============ PROJETS, TÂCHES ET GANTT ============ */
 const PSTAT=['Prévu','En cours','Suspendu','Terminé'];
 function projStats(p){const ts=live(D.tasks).filter(t=>t.projet===p.id),t=today();const av=ts.length?Math.round(ts.reduce((s,x)=>s+(+x.av||0),0)/ts.length):(p.statut==='Terminé'?100:0);return {ts,av,late:ts.filter(x=>x.fin<t&&(+x.av||0)<100).length}}
@@ -1507,12 +1609,13 @@ function projets(){
 }
 function projetView(){
   const p=byId('projects',sub.pid);if(!p||p.del)return bk('projets','Projets')+'<p class="empty">Projet introuvable.</p>';
-  const s=projStats(p),can=perm('projets'),t=today();
+  const s=projStats(p),can=perm('projets')||(p.kind==='chantier'&&perm('chantiers')),t=today();
   const ts=s.ts.slice().sort((a,b)=>a.debut.localeCompare(b.debut)||a.fin.localeCompare(b.fin));
-  return bk('projets','Projets')+`<h2>${esc(p.nom)}</h2><p class="small muted">${esc(actNom(p.act))} · responsable ${esc(userNom(p.resp))} · ${dfr(p.debut)} → ${dfr(p.fin)} (${dd(p.debut,p.fin)+1} jours)${p.client?' · client '+esc(tiersNom(p.client)):''} · <span class="tag">${esc(p.statut)}</span></p>
+  const CH=p.kind==='chantier';
+  return (CH?`<button class="ghost" data-go="activites" data-sub3="elec" style="margin-bottom:10px">← Chantiers</button>`:bk('projets','Projets'))+`<h2>${esc(p.nom)}</h2><p class="small muted">${esc(actNom(p.act))} · responsable ${esc(userNom(p.resp))} · ${dfr(p.debut)} → ${dfr(p.fin)} (${dd(p.debut,p.fin)+1} jours)${p.client?' · client '+esc(tiersNom(p.client)):''} · <span class="tag">${esc(p.statut)}</span></p>
   <div class="kpis"><div class="kpi"><div class="l">Avancement</div><div class="v">${s.av} %</div></div><div class="kpi"><div class="l">Tâches</div><div class="v">${ts.filter(x=>(+x.av||0)>=100).length} / ${ts.length}</div></div><div class="kpi"><div class="l">En retard</div><div class="v ${s.late?'neg':''}">${s.late}</div></div><div class="kpi"><div class="l">Jours restants</div><div class="v ${p.fin<t?'neg':''}">${Math.max(0,dd(t,p.fin))}</div></div>${+p.budget?`<div class="kpi"><div class="l">Budget</div><div class="v">${money(p.budget)}</div></div>`:''}</div>
   ${p.desc?`<p>${esc(p.desc).replace(/\n/g,'<br>')}</p>`:''}
-  <div class="btns">${can?`<button class="pr" data-act="task" data-p="${esc(p.id)}">+ Tâche</button><button class="ghost" data-act="proj" data-id="${esc(p.id)}">Modifier le projet</button>`:''}</div>
+  <div class="btns">${can?`<button class="pr" data-act="task" data-p="${esc(p.id)}">+ Tâche</button>${CH?'':`<button class="ghost" data-act="proj" data-id="${esc(p.id)}">Modifier le projet</button>`}`:''}</div>${CH?chantierBlock(p):''}
   <h3>Diagramme de Gantt</h3>${zoomSeg()}${gantt(ts.map(x=>({id:x.id,label:x.nom,sub:userNom(x.resp)+(x.dep?' · après '+((byId('tasks',x.dep)||{}).nom||''):''),debut:x.debut,fin:x.fin,av:+x.av||0,ms:!!x.jalon,late:x.fin<t&&(+x.av||0)<100,act:'task'})),UI.gz||'S')}
   <h3>Tâches</h3>${ts.length?`<table class="stack"><thead><tr><th>Tâche</th><th>Responsable</th><th>Dates</th><th class="n">Avancement</th></tr></thead><tbody>${ts.map(x=>`<tr data-act="task" data-id="${esc(x.id)}" style="cursor:pointer"><td><b>${esc(x.nom)}</b>${x.jalon?' <span class="tag y">Jalon</span>':''}</td><td>${esc(userNom(x.resp))}</td><td>${dfr(x.debut)} → ${dfr(x.fin)}</td><td class="n ${x.fin<t&&(+x.av||0)<100?'neg':''}">${+x.av||0} %</td></tr>`).join('')}</tbody></table>`:'<p class="muted">Ajoutez les tâches du projet.</p>'}`;
 }
@@ -1526,7 +1629,7 @@ function projForm(id){const p=id?byId('projects',id):{id:'',nom:'',act:UI.lastAc
   <label class="f">Description et objectifs<textarea name="desc" maxlength="800">${esc(p.desc)}</textarea></label>
   <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button>${id?`<button type="button" class="dg" data-act="delProj" data-id="${esc(id)}">Supprimer</button>`:''}</div></form>`)}
 function taskForm(id,pid){const x=id?byId('tasks',id):null,p=byId('projects',x?x.projet:pid);if(!p)return;
-  const full=perm('projets'),mine=x&&x.resp===ME;if(!full&&!mine)return toast('Tâche attribuée à '+userNom(x?.resp));
+  const full=perm('projets')||(p.kind==='chantier'&&perm('chantiers')),mine=x&&x.resp===ME;if(!full&&!mine)return toast('Tâche attribuée à '+userNom(x?.resp));
   const t=x||{id:'',projet:p.id,nom:'',resp:ME,debut:today()<p.debut?p.debut:today(),fin:addDays(today()<p.debut?p.debut:today(),6),av:0,dep:'',jalon:false,note:''};
   const others=live(D.tasks).filter(y=>y.projet===p.id&&y.id!==t.id);
   openSheet(`<h2>${id?esc(t.nom):'Nouvelle tâche'}</h2><p class="small muted">Projet : ${esc(p.nom)}</p><form id="ftask" data-id="${esc(t.id)}" data-p="${esc(p.id)}">
@@ -1538,7 +1641,7 @@ function taskForm(id,pid){const x=id?byId('tasks',id):null,p=byId('projects',x?x
   <label class="f">Note<textarea name="note" maxlength="500">${esc(t.note||'')}</textarea></label>
   <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button>${id&&full?`<button type="button" class="dg" data-act="delTask" data-id="${esc(id)}">Supprimer</button>`:''}</div></form>`)}
 async function saveTask(f,F){
-  const id=f.dataset.id,full=perm('projets');const t=id?JSON.parse(JSON.stringify(byId('tasks',id))):{id:uid(),projet:f.dataset.p};
+  const pp=byId('projects',f.dataset.p||(byId('tasks',f.dataset.id)||{}).projet)||{};const id=f.dataset.id,full=perm('projets')||(pp.kind==='chantier'&&perm('chantiers'));const t=id?JSON.parse(JSON.stringify(byId('tasks',id))):{id:uid(),projet:f.dataset.p};
   if(full){if(F.fin<F.debut)throw new Error('La fin est avant le début');Object.assign(t,{nom:F.nom.slice(0,100),resp:F.resp,dep:F.dep||'',debut:F.debut,fin:F.fin,jalon:!!F.jalon});
     if(t.dep){const d=byId('tasks',t.dep);if(d&&t.debut<d.fin)toast('Attention : commence avant la fin de « '+d.nom+' »')}}
   t.av=Math.max(0,Math.min(100,+F.av||0));t.note=(F.note||'').slice(0,500);
@@ -1746,6 +1849,10 @@ document.addEventListener('click',ev=>{
     fweek:()=>{sub.fweek=sub.fweek===k?'':k;render()},
     bande:()=>bandeForm(id),openBande:()=>bandeView(id),pop:()=>popForm(k||'',b.dataset.c||''),
     delPop:async()=>{if(!ask('Supprimer cette opération ? Son écriture comptable éventuelle n\'est pas supprimée.'))return;const o=JSON.parse(JSON.stringify(byId('pouops',id)));o.del=true;await commit('pouops',o,'suppression opération élevage','');render();bandeView(o.bande)},
+    chantier:()=>chantierForm(id),chop:()=>chopForm(k,id),chMat:()=>chMatForm(id),
+    chNext:async()=>{const p=JSON.parse(JSON.stringify(byId('projects',id)));const i=CHSTAT.indexOf(p.statut);if(i<0||i>=CHSTAT.length-1)return;p.statut=CHSTAT[i+1];await commit('projects',p,'étape chantier',p.nom+' → '+p.statut);render();toast('Chantier : '+p.statut)},
+    chDevis:()=>{const p=byId('projects',id);docForm('D',null,{proj:p.id,client:p.client})},
+    delChop:async()=>{if(!ask('Supprimer cette ligne ? Son écriture comptable éventuelle n\'est pas supprimée.'))return;const o=JSON.parse(JSON.stringify(byId('chops',id)));o.del=true;await commit('chops',o,'suppression ligne chantier',o.lib);render()},
     proj:()=>projForm(id),openProj:()=>{sub.pid=id;go('projet')},task:()=>taskForm(id,b.dataset.p||sub.pid),
     zoom:()=>{UI.gz=k;saveUI();render()},
     delTask:async()=>{if(!ask('Supprimer cette tâche ?'))return;const x=JSON.parse(JSON.stringify(byId('tasks',id)));x.del=true;await commit('tasks',x,'suppression tâche',x.nom);closeSheet();render()},
@@ -1852,6 +1959,9 @@ document.addEventListener('submit',ev=>{
     case 'fcyc':{const id=f.dataset.id;const o=id?JSON.parse(JSON.stringify(byId('cycles',id))):{id:uid()};Object.assign(o,{parcelle:F.parcelle,culture:F.culture,variete:(F.variete||'').slice(0,60),semis:F.semis,recolte:F.recolte||'',surface:Math.max(0,+F.surface||0),objectif:Math.max(0,+F.objectif||0),prix:Math.max(0,+F.prix||0),statut:F.statut});if(!o.parcelle)throw new Error('Choisissez une parcelle');await commit('cycles',o,id?'modification campagne':'nouvelle campagne',o.culture);closeSheet();render();cycleView(o.id);break}
     case 'ffop':await saveFop(F);break;
     case 'fbande':await saveBande(f,F);break;
+    case 'fchant':await saveChantier(f,F);break;
+    case 'fchop':await saveChop(f,F);break;
+    case 'fchmat':{const it=byId('items',F.item),q=+F.q;if(!(q>0))throw new Error('Quantité invalide');const m={id:uid(),date:F.date,item:F.item,type:'S',q,pu:0,motif:'Chantier : '+byId('projects',f.dataset.p).nom,proj:f.dataset.p,entryId:'',st:'V'};if(!stockOK(m.item,[...D.moves,m]))throw new Error('Stock insuffisant à cette date');await commit('moves',m,'sortie chantier',it.nom+' '+q);closeSheet();render();toast('Matériel imputé au chantier');break}
     case 'fpop':await savePop(f.dataset.k,F);break;
     case 'fproj':{const id=f.dataset.id;if(F.fin<F.debut)throw new Error('La fin est avant le début');const o=id?JSON.parse(JSON.stringify(byId('projects',id))):{id:uid()};Object.assign(o,{nom:F.nom.slice(0,100),act:F.act,resp:F.resp,debut:F.debut,fin:F.fin,statut:F.statut,budget:Math.max(0,+F.budget||0),client:F.client||'',desc:(F.desc||'').slice(0,800)});await commit('projects',o,id?'modification projet':'nouveau projet',o.nom);closeSheet();sub.pid=o.id;go('projet');break}
     case 'ftask':await saveTask(f,F);break;
