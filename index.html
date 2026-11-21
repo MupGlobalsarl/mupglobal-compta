@@ -44,6 +44,26 @@ h3{font-size:17px;margin:22px 0 10px;font-weight:700}
 .kpi .v{font-size:19px;font-weight:800;white-space:nowrap}
 .kpi .l{font-size:13px;color:var(--sl)}
 .grid2{display:grid;gap:0 32px}@media(min-width:900px){.grid2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.gantt{overflow-x:auto;border:1px solid var(--ln);border-radius:4px;position:relative;-webkit-overflow-scrolling:touch}
+.grow{display:flex;min-height:40px;border-bottom:1px solid var(--ln)}.grow:last-child{border-bottom:0}
+.gl{position:sticky;left:0;z-index:2;flex:none;width:132px;background:var(--bg);padding:6px 8px;font-size:13px;line-height:1.25;border-right:1px solid var(--ln)}
+.gl b{display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gl span{color:var(--sl);font-size:12px}
+.gt{position:relative;flex:none}
+.ghd .gt{height:34px}.ghd .gl{font-weight:700;color:var(--sl);font-size:12px;display:flex;align-items:flex-end}
+.gtick{position:absolute;top:0;bottom:0;border-left:1px solid var(--ln);font-size:11px;color:var(--sl);padding:2px 3px;white-space:nowrap}
+.gbar{position:absolute;top:9px;height:22px;border-radius:3px;background:light-dark(#d7dde2,#323a42);overflow:hidden;cursor:pointer;border:0;padding:0;min-height:0}
+.gbar i{position:absolute;inset:0 auto 0 0;background:var(--ink);opacity:.85}
+.gbar em{position:relative;z-index:1;font-style:normal;font-size:11px;font-weight:700;padding:0 6px;line-height:22px;color:var(--bg);mix-blend-mode:normal;white-space:nowrap}
+.gbar.late{outline:2px solid var(--rd)}.gbar.ms{width:16px!important;height:16px;top:12px;transform:rotate(45deg);background:var(--y);border-radius:2px}
+.gtoday{position:absolute;top:0;bottom:0;width:2px;background:var(--rd);z-index:1;pointer-events:none}
+.prog{height:8px;background:var(--pn);border:1px solid var(--ln);border-radius:4px;overflow:hidden}.prog i{display:block;height:100%;background:var(--ink)}
+.vbars{display:flex;align-items:flex-end;gap:4px;height:170px;padding-top:18px;border-bottom:1px solid var(--ln)}
+.vbars button{flex:1;min-width:0;background:var(--ink);border:0;border-radius:3px 3px 0 0;padding:0;min-height:2px;cursor:pointer;position:relative}
+.vbars button.on{background:var(--y);outline:1px solid var(--yi)}
+.vlab{display:flex;gap:4px;font-size:11px;color:var(--sl)}.vlab span{flex:1;text-align:center;min-width:0;overflow:hidden}
+.acard{border:1px solid var(--ln);border-radius:4px;padding:14px;cursor:pointer;background:var(--bg)}.acard h4{margin:0 0 6px;font-size:16px}
+.agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:18px}
+.soon{opacity:.55}
 .bars .row{display:grid;grid-template-columns:44px minmax(0,1fr) 110px;gap:8px;align-items:center;font-size:13px;padding:3px 0}
 .bars .tr{display:flex;flex-direction:column;gap:2px}
 .bars .b{height:9px;border-radius:2px;min-width:1px}
@@ -128,18 +148,18 @@ textarea{min-height:70px}
 </head>
 <body class="locked">
 <header>
-  <h1>MupGlobal Compta<small id="sttl">Version 3 sécurisée</small></h1>
+  <h1>MupGlobal Compta<small id="sttl">Version 4</small></h1>
   <button class="who hb" data-go="reglages" id="who">—</button>
   <button class="ic hb" data-act="lockNow" aria-label="Verrouiller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
 </header>
 <main id="app"><p class="empty">Chargement…</p></main>
 <nav id="nav">
   <button data-go="accueil"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Accueil</button>
+  <button data-go="activites"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21c-4-3-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-3 8-7 11z"/><path d="M12 7v7M9 10l3-3 3 3"/></svg>Activités</button>
+  <button data-go="projets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h8M6 10h12M9 15h9M4 20h7"/></svg>Projets</button>
   <button data-go="saisir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Saisir</button>
   <button data-go="factures"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7M9 8h3"/></svg>Factures</button>
-  <button data-go="stocks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>Actifs</button>
-  <button data-go="paie"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21 20c0-2.6-1.6-4.8-4-5.6"/></svg>Paie</button>
-  <button data-go="etats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>États</button>
+  <button data-go="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>Plus</button>
 </nav>
 <div id="ov"><div id="sheet" role="dialog" aria-modal="true"></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -219,7 +239,7 @@ const TR=c=>TRESO.find(t=>t[0]===c);
 const isTreso=c=>!!TR(c);
 const JR={CA:'Caisse',BQ:'Banque',MM:'Mobile money',AC:'Achats',VE:'Ventes',PA:'Paie',OD:'Opérations diverses',AN:'À-nouveaux'};
 const STK={'311':{l:'Marchandises',ach:'601',v:'6031'},'321':{l:'Matières premières',ach:'602',v:'6032'},'331':{l:'Fournitures consommables',ach:'604',v:'6033'},'361':{l:'Produits finis',ach:null,v:'736'}};
-const COLL=['users','roles','accounts','acts','tiers','items','emps','docs','entries','pays','slips','moves','assets','recs','log'];
+const COLL=['users','roles','accounts','acts','tiers','items','emps','docs','entries','pays','slips','moves','assets','recs','projects','tasks','parcels','cycles','farmops','log'];
 const ROLES=['Gérant','Comptable','Saisie'];
 
 /* ============ ÉTAT ============ */
@@ -233,8 +253,8 @@ const live=a=>a.filter(x=>!x.del);
 const byId=(c,id)=>id?D[c].find(x=>x.id===id):undefined;
 const meU=()=>byId('users',ME);
 const role=()=>meU()?.role||'Saisie';
-const PERMS=[['valider','Valider les écritures, émettre factures et avoirs, encaisser, contrepasser'],['etats','Voir le tableau de bord et les états financiers'],['paie','Gérer les employés et la paie'],['stocks','Gérer les stocks (articles et mouvements)'],['immo','Immobilisations et rapprochement bancaire'],['tiers','Créer et modifier clients et fournisseurs']];
-const BUILTIN={'Gérant':null,'Comptable':null,'Saisie':['stocks','tiers']};
+const PERMS=[['valider','Valider les écritures, émettre factures et avoirs, encaisser, contrepasser'],['etats','Voir le tableau de bord et les états financiers'],['paie','Gérer les employés et la paie'],['stocks','Gérer les stocks (articles et mouvements)'],['immo','Immobilisations et rapprochement bancaire'],['tiers','Créer et modifier clients et fournisseurs'],['projets','Créer et piloter les projets et les tâches'],['ferme','Ferme maraîchère : parcelles, campagnes, opérations']];
+const BUILTIN={'Gérant':null,'Comptable':null,'Saisie':['stocks','tiers','ferme']};
 function perm(p,u){u=u||meU();if(!u)return false;const r=u.role;if(r==='Gérant'||r==='Comptable')return true;if(r==='Saisie')return BUILTIN.Saisie.includes(p);const ro=D.roles&&D.roles.find(x=>x.id===r&&!x.del);return !!(ro&&ro.perms&&ro.perms[p])}
 const roleName=r=>BUILTIN[r]!==undefined?r:((D.roles||[]).find(x=>x.id===r)||{}).nom||'Rôle supprimé';
 const isAdmin=()=>perm('valider');
@@ -335,6 +355,10 @@ function canWrite(u,c,r,old){
       if(old&&!(r.st==='V'?sameExcept(old,r,['nom','act']):(r.st==='C'&&sameExcept(old,r,['st','cession']))))return 'immobilisation : seuls le nom, l\'activité ou la cession peuvent changer';
       if(!(+r.cout>0)||!(+r.duree>=0)||!/^2[0-7]/.test(r.compte||''))return 'immobilisation invalide';
       break;
+    case 'projects':if(!perm('projets',u))return 'droit « projets » requis';break;
+    case 'tasks':if(perm('projets',u))break;if(old&&old.resp===u.id&&sameExcept(old,r,['av','note']))break;return 'droit « projets » requis (ou tâche qui vous est attribuée)';
+    case 'parcels':case 'cycles':if(!perm('ferme',u))return 'droit « ferme » requis';break;
+    case 'farmops':if(!perm('ferme',u))return 'droit « ferme » requis';if(old&&!adm&&!own)return 'modification réservée à son auteur';break;
     case 'recs':
       if(!perm('immo',u))return 'droit « rapprochement » requis';
       if(old)return 'rapprochement validé intangible';
@@ -413,7 +437,9 @@ function validRec(c,r){
   if(['entries','pays','moves'].includes(c)&&!RX.date.test(r.date||''))return false;
   if(c==='docs'&&!RX.date.test(r.date||''))return false;
   if(c==='slips'&&!RX.mois.test(r.mois||''))return false;
-  if((c==='assets'||c==='recs')&&!RX.date.test(r.date||''))return false;
+  if((c==='assets'||c==='recs'||c==='farmops')&&!RX.date.test(r.date||''))return false;
+  if((c==='tasks'||c==='projects')&&!(RX.date.test(r.debut||'')&&RX.date.test(r.fin||'')))return false;
+  if(c==='cycles'&&!RX.date.test(r.semis||''))return false;
   if(c==='recs'&&!Array.isArray(r.points))return false;
   if(c==='accounts'&&!RX.code.test(r.code||''))return false;
   if(c==='entries'&&!r.del&&!balancedLines(r.lines))return false;
@@ -527,10 +553,11 @@ function go(v){view=v;UI.view=v;saveUI();render();window.scrollTo(0,0)}
 function render(){
   if(!D){document.body.classList.add('locked');$('#app').innerHTML=HDR?lockScreen():setupScreen();return}
   document.body.classList.remove('locked');
-  $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.go===view));
+  const NV={stocks:'plus',paie:'plus',etats:'plus',reglages:'plus',projet:'projets'}[view]||view;
+  $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.go===NV));
   $('#who').textContent=(meU()?.nom||'?').split(' ')[0]+' · '+roleName(role());
   $('#sttl').textContent=D.settings.nom+' · '+EX()+' · tenue en '+BASE();
-  const V={accueil,saisir,factures,stocks,paie,etats,reglages};
+  const V={accueil,saisir,factures,stocks,paie,etats,reglages,activites,projets,projet:projetView,plus:plusView};
   $('#app').innerHTML=(V[view]||accueil)();
 }
 function openSheet(h){$('#sheet').innerHTML=h;$('#ov').classList.add('on');setTimeout(()=>{const f=$('#sheet input:not([type=hidden]),#sheet select');f&&f.focus()},50)}
@@ -735,6 +762,7 @@ function alertes(){
   for(const [c,l] of TRESO.filter(t=>t[3]!=='CA')){if(!posted().some(e=>e.lines.some(x=>x.c===c)))continue;const last=live(D.recs).filter(r=>r.compte===c).sort((a,b)=>b.date.localeCompare(a.date))[0];if(!last||last.date<addDays(t,-35))a.push(['o',`${l} : aucun rapprochement bancaire depuis ${last?dfr(last.date):'le début'}`,'etats'])}
   if(t.slice(5,7)==='12'&&live(D.assets).some(x=>x.st==='V'&&+x.duree>0)&&!posted().some(e=>e.src?.type==='dotation'&&e.src.ref==t.slice(0,4)&&!isReversed(e.id)))a.push(['o','Dotations aux amortissements '+t.slice(0,4)+' à générer','stocks']);
   if(SRV()&&SYNC.err)a.push(['r','Synchronisation serveur en erreur : '+esc(SYNC.err),'reglages']);
+  {const myLate=live(D.tasks).filter(x=>x.resp===ME&&(+x.av||0)<100&&x.fin<t);if(myLate.length)a.push(['r',`${myLate.length} tâche(s) qui vous sont attribuées sont en retard`,'projets'])}
   const lm=new Date();lm.setDate(0);const prevM=lm.toLocaleDateString('sv-SE').slice(0,7);
   if(isGerant()&&lockDate()<lastDay(prevM))a.push(['o',`Le mois de ${MOISL[+prevM.slice(5)-1]} n'est pas encore clôturé`,'reglages']);
   const days=LOC.lastExport?Math.floor((NOW()-LOC.lastExport)/864e5):null;
@@ -742,7 +770,7 @@ function alertes(){
   return a;
 }
 function accueil(){
-  if(!perm('etats')){const mine=live(D.entries).filter(e=>e.cr===ME&&e.st==='B');return `<h2>Bonjour ${esc(meU().nom.split(' ')[0])}</h2><p class="muted">${isAdmin()?'':'Vos opérations sont validées par le gérant ou le comptable.'}</p><div class="btns"><button class="pr" data-act="quick" data-k="vente">+ Recette</button><button class="pr" data-act="quick" data-k="depense">+ Dépense</button><button data-act="doc" data-k="D">+ Devis</button></div><h3>Mes brouillons en attente (${mine.length})</h3>${mine.map(entryCard).join('')||'<p class="muted">Aucun.</p>'}`}
+  if(!perm('etats')){const mine=live(D.entries).filter(e=>e.cr===ME&&e.st==='B');return pilotage()+`<h2>Bonjour ${esc(meU().nom.split(' ')[0])}</h2><p class="muted">${isAdmin()?'':'Vos opérations sont validées par le gérant ou le comptable.'}</p><div class="btns"><button class="pr" data-act="quick" data-k="vente">+ Recette</button><button class="pr" data-act="quick" data-k="depense">+ Dépense</button><button data-act="doc" data-k="D">+ Devis</button></div><h3>Mes brouillons en attente (${mine.length})</h3>${mine.map(entryCard).join('')||'<p class="muted">Aucun.</p>'}`}
   const y=EX(),R=resultat(bEx(y)),fx=tresoFx(),all=bTo('9999-12-31');
   const cli=solde(all,['411']),four=solde(all,['401'],'C');
   const tB=r2(TRESO.reduce((s,[c,,cur])=>s+toBase(fx[c]||0,cur),0));
@@ -751,7 +779,7 @@ function accueil(){
   for(let i=1;i<=12;i++){const k=y+'-'+String(i).padStart(2,'0');const mm=balances('m'+k,e=>e.date.startsWith(k));const p=solde(mm,['7','82','84','86','88'],'C'),c=solde(mm,['6','81','83','85','87','89'],'D');rows.push([i,p,c]);mx=Math.max(mx,p,c)}
   const act=analytique(y);let amx=1;act.forEach(a=>amx=Math.max(amx,Math.abs(a.r)));
   const al=alertes();
-  return `<div class="hero"><div class="lbl">Résultat net de l'exercice ${y}</div><div class="big">${money(R.XI)}</div><div class="sub">≈ ${money(fromBase(R.XI,oth),oth)} au taux de ${fmt(RATE())} FC/$ · chiffre d'affaires ${money(R.XB)}</div></div>
+  return pilotage()+`<div class="hero"><div class="lbl">Résultat net de l'exercice ${y}</div><div class="big">${money(R.XI)}</div><div class="sub">≈ ${money(fromBase(R.XI,oth),oth)} au taux de ${fmt(RATE())} FC/$ · chiffre d'affaires ${money(R.XB)}</div></div>
   <div class="kpis">${TRESO.filter(([c])=>fx[c]).map(([c,l,cur])=>`<div class="kpi"><div class="l">${l}</div><div class="v ${fx[c]<0?'neg':''}">${money(fx[c],cur)}</div></div>`).join('')}
   <div class="kpi"><div class="l">Trésorerie totale (en ${BASE()})</div><div class="v">${money(tB)}</div></div>
   <div class="kpi"><div class="l">Clients à encaisser</div><div class="v">${money(cli)}</div></div>
@@ -1197,7 +1225,7 @@ function reglages(){
     <h3>Activités</h3>${live(D.acts).map(a=>`<div class="card"><div class="top"><b>${esc(a.nom)}</b><button class="ghost" data-act="actEdit" data-id="${esc(a.id)}">Renommer</button></div></div>`).join('')}<div class="btns"><button data-act="actEdit">+ Ajouter une activité</button></div>
     <h3>Plan comptable</h3><p class="small muted">${live(D.accounts).length} comptes SYSCOHADA.</p><div class="btns"><button data-act="newAcc">+ Ajouter un sous-compte</button></div>`
   })[t]?.()||''}
-  <p class="small muted">MupGlobal Compta V3 · appareil ${esc(LOC.code)} · ${esc(HDR.dev)}</p>`;
+  <p class="small muted">MupGlobal Compta V4 · appareil ${esc(LOC.code)} · ${esc(HDR.dev)}</p>`;
 }
 function userForm(id){const u=id?byId('users',id):{id:'',nom:'',role:'Saisie',actif:true,keys:[]};
   openSheet(`<h2>${id?esc(u.nom):'Nouveau collaborateur'}</h2><form id="fu" data-id="${esc(u.id)}"><label class="f">Nom<input name="nom" value="${esc(u.nom)}" required maxlength="120"></label>
@@ -1225,6 +1253,192 @@ async function closePeriod(m){
 }
 const balRowsTo=d=>Object.entries(bTo(d)).sort().map(([c,b])=>[c,r2(b.d),r2(b.k)]);
 
+
+/* ============ PILOTAGE GÉNÉRAL ============ */
+function pilotage(){
+  const t=today(),my=live(D.tasks).filter(x=>x.resp===ME&&(+x.av||0)<100);
+  const late=my.filter(x=>x.fin<t).length,projs=live(D.projects).filter(p=>p.statut!=='Terminé');
+  const plate=projs.filter(p=>projStats(p).late>0||p.fin<t).length;
+  const cyc=live(D.cycles).filter(c=>c.statut!=='Clôturée');let kg=0;for(const c of cyc)kg+=cycleStats(c).kg;
+  return `<div class="agrid">
+  <div class="acard" data-go="activites"><h4>Ferme maraîchère</h4><div class="kpi" style="border:0;padding:0"><div class="v">${fmtQ(kg)} kg</div><div class="l">récoltés · ${cyc.length} campagne(s) en cours</div></div></div>
+  <div class="acard" data-go="projets"><h4>Projets</h4><div class="kpi" style="border:0;padding:0"><div class="v">${projs.length} actif(s)</div><div class="l ${plate?'neg':''}">${plate?plate+' en retard':'aucun retard'}</div></div></div>
+  <div class="acard" data-go="projets" data-sub2="mine"><h4>Mes tâches</h4><div class="kpi" style="border:0;padding:0"><div class="v">${my.length} ouverte(s)</div><div class="l ${late?'neg':''}">${late?late+' en retard':'à jour'}</div></div></div>
+  </div>`;
+}
+function plusView(){
+  const T=[['stocks','Actifs','Stocks, immobilisations'],['paie','Paie','Employés, bulletins'],['etats','États financiers','Bilan, résultat, journal, TVA, rapprochement'],['reglages','Réglages','Synchronisation, utilisateurs, rôles, clôture, audit']];
+  return `<h2>Plus</h2><div class="tiles">${T.map(([v,l,d])=>`<button data-go="${v}">${l}<span>${d}</span></button>`).join('')}</div>`;
+}
+const bk=(v,l)=>`<button class="ghost" data-go="${v}" style="margin-bottom:10px">← ${l}</button>`;
+
+/* ============ ACTIVITÉS : FERME MARAÎCHÈRE ============ */
+const CULTURES=['Gombo','Aubergine africaine','Tomate','Amarante','Chou','Piment','Oignon','Maïs','Autre'];
+const FOPS={T:'Travail (main-d\'œuvre)',I:'Intrant (semences, engrais)',P:'Traitement phytosanitaire',A:'Irrigation, carburant',R:'Récolte',V:'Vente de récolte'};
+const FOPACC={T:'661',I:'602',P:'604',A:'605'};
+const CSTAT=['En préparation','En culture','En récolte','Clôturée'];
+function farmAct(){return (live(D.acts).find(a=>/ferme|mara/i.test(a.nom))||live(D.acts)[0]||{}).id}
+function cycleStats(c){
+  const p=byId('parcels',c.parcelle)||{},surf=+c.surface||+p.surface||0;let cost=0,jh=0,kg=0,ca=0,kgv=0;const byT={};
+  const ops=live(D.farmops).filter(o=>o.cycle===c.id);
+  for(const o of ops){if(o.type==='R')kg+=+o.qte||0;else if(o.type==='V'){ca+=+o.montant||0;kgv+=+o.qte||0}else{cost+=+o.cout||0;jh+=+o.jh||0;byT[o.type]=(byT[o.type]||0)+(+o.cout||0)}}
+  return {ops,surf,cost:r2(cost),jh,kg,ca:r2(ca),kgv,rdt:surf?kg/surf:0,ckg:kg?cost/kg:0,marge:r2(ca-cost),byT,obj:+c.objectif||0};
+}
+function weekKey(d){const x=new Date(d+'T12:00:00');const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);return x.toLocaleDateString('sv-SE')}
+function activites(){
+  const a=sub.act||'ferme';
+  const tabs=[['ferme','Ferme maraîchère',1],['poulets','Poulets de chair',0],['elec','Électricité & solaire',0],['couture','Couture & peinture',0]];
+  return `<h2>Activités</h2><div class="seg">${tabs.map(([k,l,on])=>`<button class="${a===k?'on':''} ${on?'':'soon'}" data-act="sub" data-k="act" data-v="${k}">${l}</button>`).join('')}</div>
+  ${a==='ferme'?fermeView():`<div class="card"><b>${esc(tabs.find(x=>x[0]===a)[1])}</b><p class="muted">Ce module arrive dans une prochaine étape. En attendant, ses opérations se saisissent dans « Saisir » avec l'activité correspondante, et sa rentabilité apparaît dans les états.</p></div>`}`;
+}
+function fermeView(){
+  const ps=live(D.parcels),cs=live(D.cycles).sort((x,y)=>y.semis.localeCompare(x.semis)),can=perm('ferme');
+  const act=cs.filter(c=>c.statut!=='Clôturée');let surf=0,kg=0,cost=0,ca=0;
+  for(const c of cs){const s=cycleStats(c);kg+=s.kg;cost+=s.cost;ca+=s.ca}for(const p of ps)surf+=+p.surface||0;
+  // récolte par semaine sur 12 semaines
+  const wk=[];let w=weekKey(today());for(let i=0;i<12;i++){wk.unshift(w);w=addDays(w,-7)}
+  const per={};for(const o of live(D.farmops))if(o.type==='R'){const k=weekKey(o.date);per[k]=(per[k]||0)+(+o.qte||0)}
+  const mx=Math.max(1,...wk.map(k=>per[k]||0)),sel=sub.fweek;
+  const det=sel?live(D.farmops).filter(o=>o.type==='R'&&weekKey(o.date)===sel):[];
+  return `<div class="kpis">
+    <div class="kpi"><div class="l">Surface cultivable</div><div class="v">${fmtQ(surf)} ha</div></div>
+    <div class="kpi"><div class="l">Campagnes en cours</div><div class="v">${act.length}</div></div>
+    <div class="kpi"><div class="l">Récolte cumulée</div><div class="v">${fmtQ(kg)} kg</div></div>
+    <div class="kpi"><div class="l">Coût de revient moyen</div><div class="v">${kg?money(cost/kg)+'/kg':'—'}</div></div>
+    <div class="kpi"><div class="l">Ventes de récolte</div><div class="v">${money(ca)}</div></div>
+    <div class="kpi"><div class="l">Marge (ventes − coûts)</div><div class="v ${ca-cost<0?'neg':''}">${money(ca-cost)}</div></div></div>
+  ${can?`<div class="btns"><button class="pr" data-act="fop" data-k="R">+ Récolte</button><button data-act="fop">+ Opération</button><button data-act="cycle">+ Campagne</button><button class="ghost" data-act="parcel">+ Parcelle</button></div>`:''}
+  <h3>Récolte par semaine (kg)</h3><p class="small muted">Touchez une barre pour voir le détail de la semaine.</p>
+  <div class="vbars">${wk.map(k=>`<button class="${k===sel?'on':''}" style="height:${W(per[k]||0,mx)}" data-act="fweek" data-k="${k}" title="${fmtQ(per[k]||0)} kg"></button>`).join('')}</div>
+  <div class="vlab">${wk.map(k=>`<span>${k.slice(8,10)}/${k.slice(5,7)}</span>`).join('')}</div>
+  ${sel?`<div class="card" style="margin-top:10px"><b>Semaine du ${dfr(sel)} : ${fmtQ(per[sel]||0)} kg</b>${det.map(o=>`<div class="small">${dfr(o.date)} · ${esc((byId('cycles',o.cycle)||{}).culture||'')} · ${fmtQ(o.qte)} ${esc(o.unite||'kg')}${o.lib?' — '+esc(o.lib):''}</div>`).join('')||'<div class="small muted">Aucune récolte.</div>'}</div>`:''}
+  <h3>Campagnes</h3>${cs.length?cs.map(c=>{const s=cycleStats(c),p=byId('parcels',c.parcelle)||{};const tot=c.recolte?Math.max(1,(new Date(c.recolte)-new Date(c.semis))/864e5):0,el=Math.max(0,(new Date(today())-new Date(c.semis))/864e5),pc=tot?Math.min(100,el/tot*100):0;
+    return `<div class="card" data-act="openCycle" data-id="${esc(c.id)}" style="cursor:pointer"><div class="top"><b>${esc(c.culture)}${c.variete?' — '+esc(c.variete):''}</b><span class="tag ${c.statut==='Clôturée'?'':'g'}">${esc(c.statut)}</span></div>
+    <div class="small muted">${esc(p.nom||'?')} · ${fmtQ(s.surf)} ha · semis ${dfr(c.semis)}${c.recolte?' · récolte prévue '+dfr(c.recolte):''}</div>
+    ${tot?`<div class="prog" style="margin:8px 0" title="Avancement du cycle"><i style="width:${pc.toFixed(0)}%"></i></div>`:''}
+    <div class="small">Récolte <b>${fmtQ(s.kg)} kg</b>${s.obj&&s.surf?` / objectif ${fmtQ(s.obj*s.surf)} kg`:''} · rendement <b>${s.surf?fmtQ(Math.round(s.rdt))+' kg/ha':'—'}</b> · coût ${money(s.cost)} · ventes ${money(s.ca)} · marge <b class="${s.marge<0?'neg':''}">${money(s.marge)}</b></div></div>`}).join(''):'<p class="empty">Créez d\'abord vos parcelles (ex. « Parcelle gombo », 0,5 ha), puis une campagne par culture.</p>'}
+  <h3>Parcelles</h3>${ps.length?`<table class="stack"><thead><tr><th>Parcelle</th><th class="n">Surface</th><th>Lieu</th><th></th></tr></thead><tbody>${ps.map(p=>`<tr><td><b>${esc(p.nom)}</b></td><td class="n">${fmtQ(p.surface)} ha</td><td>${esc(p.lieu)}</td><td>${can?`<button class="ghost" data-act="parcel" data-id="${esc(p.id)}">Modifier</button>`:''}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">Aucune parcelle.</p>'}`;
+}
+function parcelForm(id){const p=id?byId('parcels',id):{id:'',nom:'',surface:0.5,lieu:''};
+  openSheet(`<h2>${id?'Modifier la parcelle':'Nouvelle parcelle'}</h2><form id="fparc" data-id="${esc(p.id)}"><label class="f">Nom<input name="nom" value="${esc(p.nom)}" required maxlength="80" placeholder="Parcelle gombo"></label>
+  <div class="row2"><label class="f">Surface (hectares)<input type="number" name="surface" step="0.01" min="0" value="${esc(p.surface)}" required></label><label class="f">Lieu<input name="lieu" value="${esc(p.lieu)}" maxlength="120"></label></div>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+function cycleForm(id){const ps=live(D.parcels);if(!ps.length&&!id)return toast('Créez d\'abord une parcelle');
+  const c=id?byId('cycles',id):{id:'',parcelle:ps[0]?.id,culture:'Gombo',variete:'',semis:today(),recolte:addDays(today(),75),surface:'',objectif:0,prix:0,statut:'En culture'};
+  openSheet(`<h2>${id?'Modifier la campagne':'Nouvelle campagne'}</h2><form id="fcyc" data-id="${esc(c.id)}">
+  <div class="row2"><label class="f">Parcelle<select name="parcelle">${ps.map(p=>`<option value="${esc(p.id)}" ${p.id===c.parcelle?'selected':''}>${esc(p.nom)} (${fmtQ(p.surface)} ha)</option>`).join('')}</select></label><label class="f">Culture<select name="culture">${CULTURES.map(x=>`<option ${x===c.culture?'selected':''}>${x}</option>`).join('')}</select></label></div>
+  <div class="row2"><label class="f">Variété<input name="variete" value="${esc(c.variete)}" maxlength="60"></label><label class="f">Surface semée (ha, vide = toute la parcelle)<input type="number" name="surface" step="0.01" min="0" value="${esc(c.surface||'')}"></label></div>
+  <div class="row2"><label class="f">Date de semis / repiquage<input type="date" name="semis" value="${esc(c.semis)}" required></label><label class="f">Fin de récolte prévue<input type="date" name="recolte" value="${esc(c.recolte)}"></label></div>
+  <div class="row2"><label class="f">Objectif de rendement (kg/ha)<input type="number" name="objectif" step="1" min="0" value="${esc(c.objectif||'')}"></label><label class="f">Prix de vente prévu (${BASE()}/kg)<input type="number" name="prix" step="0.01" min="0" value="${esc(c.prix||'')}"></label></div>
+  <label class="f">Statut<select name="statut">${CSTAT.map(x=>`<option ${x===c.statut?'selected':''}>${x}</option>`).join('')}</select></label>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+function cycleView(id){const c=byId('cycles',id),s=cycleStats(c),p=byId('parcels',c.parcelle)||{},can=perm('ferme');
+  const ops=s.ops.slice().sort((x,y)=>y.date.localeCompare(x.date));const tc=Math.max(1,...Object.values(s.byT));
+  openSheet(`<h2>${esc(c.culture)}${c.variete?' — '+esc(c.variete):''} <span class="tag">${esc(c.statut)}</span></h2>
+  <p class="small muted">${esc(p.nom||'')} · ${fmtQ(s.surf)} ha · semis ${dfr(c.semis)}${c.recolte?' · fin prévue '+dfr(c.recolte):''}</p>
+  <div class="kpis"><div class="kpi"><div class="l">Récolté</div><div class="v">${fmtQ(s.kg)} kg</div></div><div class="kpi"><div class="l">Rendement</div><div class="v">${s.surf?fmtQ(Math.round(s.rdt)):'—'} kg/ha</div></div>
+  <div class="kpi"><div class="l">Coût total</div><div class="v">${money(s.cost)}</div></div><div class="kpi"><div class="l">Coût par kg</div><div class="v">${s.kg?money(s.ckg):'—'}</div></div>
+  <div class="kpi"><div class="l">Ventes</div><div class="v">${money(s.ca)}</div></div><div class="kpi"><div class="l">Marge</div><div class="v ${s.marge<0?'neg':''}">${money(s.marge)}</div></div></div>
+  ${s.obj&&s.surf?`<p class="small">Objectif : ${fmtQ(s.obj*s.surf)} kg · atteint à <b>${Math.round(s.kg/(s.obj*s.surf)*100)} %</b></p><div class="prog"><i style="width:${Math.min(100,s.kg/(s.obj*s.surf)*100).toFixed(0)}%"></i></div>`:''}
+  ${Object.keys(s.byT).length?`<h3>Répartition des coûts</h3><div class="bars">${Object.entries(s.byT).map(([k,v])=>`<div class="row" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 110px"><div>${esc(FOPS[k])}</div><div class="tr"><div class="b p" style="width:${W(v,tc)}"></div></div><div class="n">${money(v)}</div></div>`).join('')}</div>`:''}
+  <p class="small muted">Main-d'œuvre : ${fmtQ(s.jh)} jour(s)-homme.</p>
+  <div class="btns">${can?`<button class="pr" data-act="fop" data-k="R" data-c="${esc(id)}">+ Récolte</button><button data-act="fop" data-c="${esc(id)}">+ Opération</button><button class="ghost" data-act="cycle" data-id="${esc(id)}">Modifier</button>`:''}<button class="ghost" data-act="close">Fermer</button></div>
+  <h3>Journal de culture</h3>${ops.map(o=>`<div class="card"><div class="top"><span><b>${esc(FOPS[o.type])}</b> · ${dfr(o.date)}</span><span class="amt">${o.type==='R'?fmtQ(o.qte)+' '+esc(o.unite||'kg'):o.type==='V'?money(o.montant):money(o.cout)}</span></div><div class="small muted">${esc(o.lib)}${o.qte&&o.type!=='R'?' · '+fmtQ(o.qte)+' '+esc(o.unite||''):''}${o.jh?' · '+fmtQ(o.jh)+' j-h':''}${o.entryId?' · comptabilisé':''} · ${esc(userNom(o.cr))}</div>${(isAdmin()||o.cr===ME)?`<button class="dg" style="margin-top:6px" data-act="delFop" data-id="${esc(o.id)}">Supprimer</button>`:''}</div>`).join('')||'<p class="muted">Aucune opération.</p>'}`)}
+function fopForm(type,cyc){const cs=live(D.cycles).filter(c=>c.statut!=='Clôturée'||c.id===cyc);if(!cs.length)return toast('Créez d\'abord une campagne');
+  type=type||'T';
+  openSheet(`<h2>Opération de culture</h2><form id="ffop">
+  <div class="row2"><label class="f">Campagne<select name="cycle">${cs.map(c=>`<option value="${esc(c.id)}" ${c.id===cyc?'selected':''}>${esc(c.culture)} — ${esc((byId('parcels',c.parcelle)||{}).nom||'')}</option>`).join('')}</select></label><label class="f">Type<select name="type" id="foptype">${Object.entries(FOPS).map(([k,l])=>`<option value="${k}" ${k===type?'selected':''}>${l}</option>`).join('')}</select></label></div>
+  <div class="row2"><label class="f">Date<input type="date" name="date" value="${today()}" required></label><label class="f">Libellé<input name="lib" maxlength="120" placeholder="Désherbage, NPK 17-17-17, cueillette…"></label></div>
+  <div class="row2"><label class="f">Quantité<input type="number" name="qte" step="any" min="0" inputmode="decimal"></label><label class="f">Unité<input name="unite" value="${type==='R'||type==='V'?'kg':''}" maxlength="15" placeholder="kg, sac, litre"></label></div>
+  <div class="row2"><label class="f">Coût (${BASE()}) — travaux et intrants<input type="number" name="cout" step="0.01" min="0" inputmode="decimal"></label><label class="f">Jours-homme<input type="number" name="jh" step="0.5" min="0"></label></div>
+  <label class="f">Montant de la vente (${BASE()}) — pour une vente<input type="number" name="montant" step="0.01" min="0" inputmode="decimal"></label>
+  <label class="f">Enregistrer aussi en comptabilité<select name="pay"><option value="">Non (déjà saisi, ou récolte)</option>${TRESO.filter(t=>t[2]===BASE()).map(([c,l])=>`<option value="${c}">Oui — ${l}</option>`).join('')}</select></label>
+  <p class="small muted">Récolte : indiquez seulement la quantité. Vente : quantité vendue et montant. Avec « Oui », l'app crée la dépense (comptes 661, 602, 604 ou 605) ou la recette (702) de l'activité ferme${isAdmin()?'':', en brouillon à valider'}.</p>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveFop(F){
+  const o={id:uid(),cycle:F.cycle,type:F.type,date:F.date,lib:(F.lib||'').slice(0,120),qte:Math.max(0,+F.qte||0),unite:(F.unite||'').slice(0,15),cout:r2(Math.max(0,+F.cout||0)),jh:Math.max(0,+F.jh||0),montant:r2(Math.max(0,+F.montant||0))};
+  if(o.type==='R'&&!(o.qte>0))throw new Error('Indiquez la quantité récoltée');
+  if(o.type==='V'&&!(o.montant>0))throw new Error('Indiquez le montant de la vente');
+  const c=byId('cycles',o.cycle);
+  if(F.pay&&o.type!=='R'){const amt=o.type==='V'?o.montant:o.cout;if(!(amt>0))throw new Error('Montant nul : rien à comptabiliser');
+    const acc=o.type==='V'?'702':FOPACC[o.type],cur=TR(F.pay)[2],lib=(o.type==='V'?'Vente ':'')+(o.lib||FOPS[o.type])+' — '+c.culture;
+    const lines=o.type==='V'?[{c:F.pay,d:amt,k:0,t:'',fx:{cur,a:amt}},{c:acc,d:0,k:amt,t:''}]:[{c:acc,d:amt,k:0,t:''},{c:F.pay,d:0,k:amt,t:'',fx:{cur,a:amt}}];
+    const e={id:uid(),date:o.date,jr:TR(F.pay)[3],piece:'FERME',lib:lib.slice(0,200),act:farmAct(),lines,src:{type:'ferme',ref:o.id},st:isAdmin()?'V':'B'};
+    await commit('entries',e,e.st==='V'?'saisie validée':'brouillon',e.lib);o.entryId=e.id}
+  await commit('farmops',o,'opération ferme',FOPS[o.type]+' '+(o.lib||''));closeSheet();render();cycleView(o.cycle);toast('Opération enregistrée');
+}
+
+/* ============ PROJETS, TÂCHES ET GANTT ============ */
+const PSTAT=['Prévu','En cours','Suspendu','Terminé'];
+function projStats(p){const ts=live(D.tasks).filter(t=>t.projet===p.id),t=today();const av=ts.length?Math.round(ts.reduce((s,x)=>s+(+x.av||0),0)/ts.length):(p.statut==='Terminé'?100:0);return {ts,av,late:ts.filter(x=>x.fin<t&&(+x.av||0)<100).length}}
+const dd=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5);
+function gantt(items,zoom){
+  if(!items.length)return '<p class="empty">Rien à afficher.</p>';
+  let d0=items.reduce((m,x)=>x.debut<m?x.debut:m,items[0].debut),d1=items.reduce((m,x)=>x.fin>m?x.fin:m,items[0].fin);
+  const t=today();if(t<d0)d0=t;if(t>d1)d1=t;d0=addDays(d0,-2);d1=addDays(d1,3);
+  const dw={J:34,S:14,M:5}[zoom]||14,n=dd(d0,d1)+1,Wd=n*dw;
+  let ticks='',lastX=-99;for(let i=0;i<n;i++){const d=addDays(d0,i),dt=new Date(d+'T12:00:00');
+    if(zoom==='J'||(zoom==='S'&&dt.getDay()===1)||(zoom==='M'&&dt.getDate()===1)||i===0){const lab=zoom==='M'||(i===0&&zoom!=='J')?MOIS[dt.getMonth()]+(zoom==='M'?' '+String(dt.getFullYear()).slice(2):' '+dt.getDate()):zoom==='J'?String(dt.getDate()):dt.getDate()+'/'+(dt.getMonth()+1);if(i*dw-lastX>=40){ticks+=`<div class="gtick" style="left:${i*dw}px">${lab}</div>`;lastX=i*dw}}}
+  const tl=dd(d0,t)*dw+dw/2;
+  return `<div class="gantt"><div class="grow ghd"><div class="gl">Tâche</div><div class="gt" style="width:${Wd}px">${ticks}</div></div>
+  ${items.map(x=>{const l=dd(d0,x.debut)*dw,w=Math.max(dw,(dd(x.debut,x.fin)+1)*dw);return `<div class="grow"><div class="gl"><b>${esc(x.label)}</b><span>${esc(x.sub||'')}</span></div><div class="gt" style="width:${Wd}px"><div class="gtoday" style="left:${tl}px"></div>
+    <button class="gbar ${x.late?'late':''} ${x.ms?'ms':''}" style="left:${l}px;width:${w}px" data-act="${x.act}" data-id="${esc(x.id)}" title="${esc(x.label)} : ${dfr(x.debut)} → ${dfr(x.fin)} · ${x.av} %">${x.ms?'':`<i style="width:${x.av}%"></i><em>${x.av} %</em>`}</button></div></div>`}).join('')}</div>
+  <p class="small muted">Barre noire : avancement · trait rouge : aujourd'hui · contour rouge : en retard · losange jaune : jalon. Touchez une barre pour l'ouvrir.</p>`;
+}
+const zoomSeg=()=>`<div class="seg">${[['J','Jours'],['S','Semaines'],['M','Mois']].map(([k,l])=>`<button class="${(UI.gz||'S')===k?'on':''}" data-act="zoom" data-k="${k}">${l}</button>`).join('')}</div>`;
+function projets(){
+  const v=sub.pv||'list',fa=sub.pact||'',t=today(),can=perm('projets');
+  const ps=live(D.projects).filter(p=>!fa||p.act===fa).sort((a,b)=>(a.statut==='Terminé')-(b.statut==='Terminé')||a.fin.localeCompare(b.fin));
+  const act=ps.filter(p=>p.statut!=='Terminé'),openT=live(D.tasks).filter(x=>(+x.av||0)<100),lateT=openT.filter(x=>x.fin<t);
+  const head=`<h2>Projets</h2><div class="seg"><button class="${v==='list'?'on':''}" data-act="sub" data-k="pv" data-v="list">Portefeuille</button><button class="${v==='gantt'?'on':''}" data-act="sub" data-k="pv" data-v="gantt">Gantt global</button><button class="${v==='mine'?'on':''}" data-act="sub" data-k="pv" data-v="mine">Mes tâches</button></div>`;
+  if(v==='mine'){const my=live(D.tasks).filter(x=>x.resp===ME).sort((a,b)=>((+a.av||0)>=100)-((+b.av||0)>=100)||a.fin.localeCompare(b.fin));
+    return head+(my.length?my.map(x=>{const p=byId('projects',x.projet)||{},lt=x.fin<t&&(+x.av||0)<100;return `<div class="card" data-act="task" data-id="${esc(x.id)}" data-p="${esc(x.projet)}" style="cursor:pointer"><div class="top"><b>${esc(x.nom)}</b><span class="tag ${lt?'r':(+x.av||0)>=100?'g':''}">${lt?'En retard':(+x.av||0)>=100?'Terminée':(+x.av||0)+' %'}</span></div><div class="small muted">${esc(p.nom||'')} · ${dfr(x.debut)} → ${dfr(x.fin)}</div><div class="prog" style="margin-top:6px"><i style="width:${+x.av||0}%"></i></div></div>`}).join(''):'<p class="empty">Aucune tâche ne vous est attribuée.</p>');}
+  const filt=`<label class="f" style="max-width:320px">Activité<select id="pact"><option value="">Toutes</option>${optActs(fa)}</select></label>`;
+  if(v==='gantt')return head+filt+zoomSeg()+gantt(ps.map(p=>{const s=projStats(p);return {id:p.id,label:p.nom,sub:actNom(p.act),debut:p.debut,fin:p.fin,av:s.av,late:s.late>0||(p.fin<t&&p.statut!=='Terminé'),act:'openProj'}}),UI.gz||'S');
+  return head+`<div class="kpis"><div class="kpi"><div class="l">Projets actifs</div><div class="v">${act.length}</div></div><div class="kpi"><div class="l">Tâches ouvertes</div><div class="v">${openT.length}</div></div><div class="kpi"><div class="l">Tâches en retard</div><div class="v ${lateT.length?'neg':''}">${lateT.length}</div></div><div class="kpi"><div class="l">Budget des projets actifs</div><div class="v">${money(act.reduce((s,p)=>s+(+p.budget||0),0))}</div></div></div>
+  ${can?'<div class="btns"><button class="pr" data-act="proj">+ Nouveau projet</button></div>':''}${filt}
+  ${ps.length?ps.map(p=>{const s=projStats(p),lt=s.late>0||(p.fin<t&&p.statut!=='Terminé');return `<div class="card" data-act="openProj" data-id="${esc(p.id)}" style="cursor:pointer"><div class="top"><b>${esc(p.nom)}</b><span class="tag ${p.statut==='Terminé'?'g':lt?'r':p.statut==='En cours'?'y':''}">${lt&&p.statut!=='Terminé'?'En retard':esc(p.statut)}</span></div>
+    <div class="small muted">${esc(actNom(p.act))} · ${esc(userNom(p.resp))} · ${dfr(p.debut)} → ${dfr(p.fin)} · ${s.ts.length} tâche(s)${s.late?' · '+s.late+' en retard':''}</div><div class="prog" style="margin-top:8px"><i style="width:${s.av}%"></i></div><div class="small" style="margin-top:4px">${s.av} % réalisé${+p.budget?' · budget '+money(p.budget):''}</div></div>`}).join(''):'<p class="empty">Aucun projet. Exemples : « Installation solaire Hôpital X », « Extension de la ferme », « Ouverture de l\'atelier couture ».</p>'}`;
+}
+function projetView(){
+  const p=byId('projects',sub.pid);if(!p||p.del)return bk('projets','Projets')+'<p class="empty">Projet introuvable.</p>';
+  const s=projStats(p),can=perm('projets'),t=today();
+  const ts=s.ts.slice().sort((a,b)=>a.debut.localeCompare(b.debut)||a.fin.localeCompare(b.fin));
+  return bk('projets','Projets')+`<h2>${esc(p.nom)}</h2><p class="small muted">${esc(actNom(p.act))} · responsable ${esc(userNom(p.resp))} · ${dfr(p.debut)} → ${dfr(p.fin)} (${dd(p.debut,p.fin)+1} jours)${p.client?' · client '+esc(tiersNom(p.client)):''} · <span class="tag">${esc(p.statut)}</span></p>
+  <div class="kpis"><div class="kpi"><div class="l">Avancement</div><div class="v">${s.av} %</div></div><div class="kpi"><div class="l">Tâches</div><div class="v">${ts.filter(x=>(+x.av||0)>=100).length} / ${ts.length}</div></div><div class="kpi"><div class="l">En retard</div><div class="v ${s.late?'neg':''}">${s.late}</div></div><div class="kpi"><div class="l">Jours restants</div><div class="v ${p.fin<t?'neg':''}">${Math.max(0,dd(t,p.fin))}</div></div>${+p.budget?`<div class="kpi"><div class="l">Budget</div><div class="v">${money(p.budget)}</div></div>`:''}</div>
+  ${p.desc?`<p>${esc(p.desc).replace(/\n/g,'<br>')}</p>`:''}
+  <div class="btns">${can?`<button class="pr" data-act="task" data-p="${esc(p.id)}">+ Tâche</button><button class="ghost" data-act="proj" data-id="${esc(p.id)}">Modifier le projet</button>`:''}</div>
+  <h3>Diagramme de Gantt</h3>${zoomSeg()}${gantt(ts.map(x=>({id:x.id,label:x.nom,sub:userNom(x.resp)+(x.dep?' · après '+((byId('tasks',x.dep)||{}).nom||''):''),debut:x.debut,fin:x.fin,av:+x.av||0,ms:!!x.jalon,late:x.fin<t&&(+x.av||0)<100,act:'task'})),UI.gz||'S')}
+  <h3>Tâches</h3>${ts.length?`<table class="stack"><thead><tr><th>Tâche</th><th>Responsable</th><th>Dates</th><th class="n">Avancement</th></tr></thead><tbody>${ts.map(x=>`<tr data-act="task" data-id="${esc(x.id)}" style="cursor:pointer"><td><b>${esc(x.nom)}</b>${x.jalon?' <span class="tag y">Jalon</span>':''}</td><td>${esc(userNom(x.resp))}</td><td>${dfr(x.debut)} → ${dfr(x.fin)}</td><td class="n ${x.fin<t&&(+x.av||0)<100?'neg':''}">${+x.av||0} %</td></tr>`).join('')}</tbody></table>`:'<p class="muted">Ajoutez les tâches du projet.</p>'}`;
+}
+const optUsers=sel=>live(D.users).filter(u=>u.actif!==false).map(u=>`<option value="${esc(u.id)}" ${u.id===sel?'selected':''}>${esc(u.nom)}</option>`).join('');
+function projForm(id){const p=id?byId('projects',id):{id:'',nom:'',act:UI.lastAct||'act0',resp:ME,debut:today(),fin:addDays(today(),30),statut:'Prévu',budget:0,client:'',desc:''};
+  openSheet(`<h2>${id?'Modifier le projet':'Nouveau projet'}</h2><form id="fproj" data-id="${esc(p.id)}"><label class="f">Nom du projet<input name="nom" value="${esc(p.nom)}" required maxlength="100"></label>
+  <div class="row2"><label class="f">Activité<select name="act">${optActs(p.act)}</select></label><label class="f">Responsable<select name="resp">${optUsers(p.resp)}</select></label></div>
+  <div class="row2"><label class="f">Début<input type="date" name="debut" value="${esc(p.debut)}" required></label><label class="f">Fin prévue<input type="date" name="fin" value="${esc(p.fin)}" required></label></div>
+  <div class="row2"><label class="f">Statut<select name="statut">${PSTAT.map(x=>`<option ${x===p.statut?'selected':''}>${x}</option>`).join('')}</select></label><label class="f">Budget (${BASE()})<input type="number" name="budget" step="0.01" min="0" value="${esc(p.budget||'')}"></label></div>
+  <label class="f">Client (facultatif)<select name="client">${optTiers('C',p.client).replace('<option value="__new">+ Nouveau…</option>','')}</select></label>
+  <label class="f">Description et objectifs<textarea name="desc" maxlength="800">${esc(p.desc)}</textarea></label>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button>${id?`<button type="button" class="dg" data-act="delProj" data-id="${esc(id)}">Supprimer</button>`:''}</div></form>`)}
+function taskForm(id,pid){const x=id?byId('tasks',id):null,p=byId('projects',x?x.projet:pid);if(!p)return;
+  const full=perm('projets'),mine=x&&x.resp===ME;if(!full&&!mine)return toast('Tâche attribuée à '+userNom(x?.resp));
+  const t=x||{id:'',projet:p.id,nom:'',resp:ME,debut:today()<p.debut?p.debut:today(),fin:addDays(today()<p.debut?p.debut:today(),6),av:0,dep:'',jalon:false,note:''};
+  const others=live(D.tasks).filter(y=>y.projet===p.id&&y.id!==t.id);
+  openSheet(`<h2>${id?esc(t.nom):'Nouvelle tâche'}</h2><p class="small muted">Projet : ${esc(p.nom)}</p><form id="ftask" data-id="${esc(t.id)}" data-p="${esc(p.id)}">
+  <fieldset ${full?'':'disabled'} style="border:0;padding:0;margin:0"><label class="f">Tâche<input name="nom" value="${esc(t.nom)}" required maxlength="100"></label>
+  <div class="row2"><label class="f">Responsable<select name="resp">${optUsers(t.resp)}</select></label><label class="f">Après la tâche<select name="dep"><option value="">— aucune —</option>${others.map(y=>`<option value="${esc(y.id)}" ${y.id===t.dep?'selected':''}>${esc(y.nom)}</option>`).join('')}</select></label></div>
+  <div class="row2"><label class="f">Début<input type="date" name="debut" value="${esc(t.debut)}" required></label><label class="f">Fin<input type="date" name="fin" value="${esc(t.fin)}" required></label></div>
+  <label class="chk"><input type="checkbox" name="jalon" ${t.jalon?'checked':''}> Jalon (étape clé, ex. réception du chantier)</label></fieldset>
+  <label class="f">Avancement : <span id="avv">${+t.av||0} %</span><input type="range" name="av" min="0" max="100" step="10" value="${+t.av||0}" style="padding:0"></label>
+  <label class="f">Note<textarea name="note" maxlength="500">${esc(t.note||'')}</textarea></label>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button>${id&&full?`<button type="button" class="dg" data-act="delTask" data-id="${esc(id)}">Supprimer</button>`:''}</div></form>`)}
+async function saveTask(f,F){
+  const id=f.dataset.id,full=perm('projets');const t=id?JSON.parse(JSON.stringify(byId('tasks',id))):{id:uid(),projet:f.dataset.p};
+  if(full){if(F.fin<F.debut)throw new Error('La fin est avant le début');Object.assign(t,{nom:F.nom.slice(0,100),resp:F.resp,dep:F.dep||'',debut:F.debut,fin:F.fin,jalon:!!F.jalon});
+    if(t.dep){const d=byId('tasks',t.dep);if(d&&t.debut<d.fin)toast('Attention : commence avant la fin de « '+d.nom+' »')}}
+  t.av=Math.max(0,Math.min(100,+F.av||0));t.note=(F.note||'').slice(0,500);
+  await commit('tasks',t,id?'mise à jour tâche':'nouvelle tâche',t.nom+' '+t.av+' %');closeSheet();render();
+}
 
 /* ============ IMMOBILISATIONS ET AMORTISSEMENTS ============ */
 const amAcc=c=>c.startsWith('21')?'281':c.startsWith('23')||c.startsWith('22')?'283':'284';
@@ -1384,7 +1598,7 @@ let busy=false;
 async function run(fn){if(busy)return;busy=true;try{await fn()}catch(x){toast(x.message||'Erreur');console.warn(x)}finally{busy=false}}
 document.addEventListener('click',ev=>{
   const g=ev.target.closest('[data-go]');
-  if(g){if(!D)return;if(g.dataset.sub)sub.etat=g.dataset.sub;closeSheet();go(g.dataset.go);return}
+  if(g){if(!D)return;if(g.dataset.sub)sub.etat=g.dataset.sub;if(g.dataset.sub2)sub.pv=g.dataset.sub2;closeSheet();go(g.dataset.go);return}
   const b=ev.target.closest('[data-act]');if(!b)return;ev.preventDefault();
   const a=b.dataset.act,id=b.dataset.id,k=b.dataset.k;
   const A={
@@ -1422,6 +1636,13 @@ document.addEventListener('click',ev=>{
     changePin:()=>changePinForm(false),
     user:()=>userForm(id),
     roleEdit:()=>roleForm(id),
+    parcel:()=>parcelForm(id),cycle:()=>cycleForm(id),openCycle:()=>cycleView(id),fop:()=>fopForm(k||'',b.dataset.c||''),
+    delFop:async()=>{if(!ask('Supprimer cette opération ? Son écriture comptable éventuelle n\'est pas supprimée.'))return;const o=JSON.parse(JSON.stringify(byId('farmops',id)));o.del=true;await commit('farmops',o,'suppression opération ferme',o.lib);const c=o.cycle;render();cycleView(c)},
+    fweek:()=>{sub.fweek=sub.fweek===k?'':k;render()},
+    proj:()=>projForm(id),openProj:()=>{sub.pid=id;go('projet')},task:()=>taskForm(id,b.dataset.p||sub.pid),
+    zoom:()=>{UI.gz=k;saveUI();render()},
+    delTask:async()=>{if(!ask('Supprimer cette tâche ?'))return;const x=JSON.parse(JSON.stringify(byId('tasks',id)));x.del=true;await commit('tasks',x,'suppression tâche',x.nom);closeSheet();render()},
+    delProj:async()=>{if(!ask('Supprimer ce projet et ses tâches ?'))return;for(const x of live(D.tasks).filter(t=>t.projet===id)){const y=JSON.parse(JSON.stringify(x));y.del=true;await commit('tasks',y,'suppression tâche',y.nom)}const p=JSON.parse(JSON.stringify(byId('projects',id)));p.del=true;await commit('projects',p,'suppression projet',p.nom);closeSheet();go('projets')},
     delRole:async()=>{if(live(D.users).some(u=>u.role===id))throw new Error('Rôle encore attribué');if(!ask('Supprimer ce rôle ?'))return;const r=JSON.parse(JSON.stringify(byId('roles',id)));r.del=true;await commit('roles',r,'suppression rôle',r.nom);closeSheet();render()},
     revokeKey:async()=>{const u=JSON.parse(JSON.stringify(byId('users',id)));const k=u.keys.find(x=>x.kid===b.dataset.k);if(!k)return;if(k.kid===KID)throw new Error('Impossible de révoquer ce téléphone');if(!ask((D.log.some(l=>l.kid===k.kid)?'Révoquer l\'appareil ':'Annuler l\'invitation ')+k.code+' de '+u.nom+' ? Cette action est définitive.'))return;k.rev=NOW();await commit('users',u,'révocation appareil',u.nom+' — appareil '+k.code);render();userForm(id);toast('Appareil '+k.code+' révoqué')},
     delUser:async()=>{if(D.log.some(l=>l.by===id)||D.entries.some(e=>e.cr===id))throw new Error('Cet utilisateur a déjà travaillé : retirez son accès au lieu de le supprimer');if(!ask('Supprimer définitivement ce collaborateur ?'))return;const u=JSON.parse(JSON.stringify(byId('users',id)));u.del=true;u.keys=u.keys.map(k=>({...k,rev:k.rev||NOW()}));await commit('users',u,'suppression utilisateur',u.nom);closeSheet();render();toast('Collaborateur supprimé')},
@@ -1461,6 +1682,8 @@ document.addEventListener('change',e=>{
   if(t.id==='jjr'){sub.jr=t.value;render()}
   if(t.id==='amois'){sub.amois=t.value;render()}
   if(t.id==='glc'){sub.gl=t.value;render()}
+  if(t.id==='pact'){sub.pact=t.value;render()}
+  if(t.name==='av'&&t.closest('#ftask')){const o=$('#avv');if(o)o.textContent=t.value+' %'}
   if(t.id==='rc'){sub.rc=t.value;sub.pts=new Set();render()}
   if(t.id==='rdate'){sub.rdate=t.value;render()}
   if(t.id==='rsolde'){sub.rsolde=t.value;render()}
@@ -1518,6 +1741,11 @@ document.addEventListener('submit',ev=>{
       const s=JSON.parse(JSON.stringify(D.settings));const old=[s.syncUrl,s.syncKey];s.syncUrl=url;s.syncKey=key;D.settings.syncUrl=url;D.settings.syncKey=key;
       try{await srvFetch('mgc_sync?select=device&limit=1')}catch(e){D.settings.syncUrl=old[0];D.settings.syncKey=old[1];throw new Error('Connexion impossible : '+e.message+'. Le script SQL a-t-il été exécuté ?')}
       D.settings.syncUrl=old[0];D.settings.syncKey=old[1];await commitSettings(s,'synchronisation serveur',url);await push();await pull(true);render();toast('Synchronisation activée');break}
+    case 'fparc':{const id=f.dataset.id;const o=id?JSON.parse(JSON.stringify(byId('parcels',id))):{id:uid()};Object.assign(o,{nom:F.nom.slice(0,80),surface:Math.max(0,+F.surface||0),lieu:(F.lieu||'').slice(0,120)});await commit('parcels',o,id?'modification parcelle':'nouvelle parcelle',o.nom);closeSheet();render();break}
+    case 'fcyc':{const id=f.dataset.id;const o=id?JSON.parse(JSON.stringify(byId('cycles',id))):{id:uid()};Object.assign(o,{parcelle:F.parcelle,culture:F.culture,variete:(F.variete||'').slice(0,60),semis:F.semis,recolte:F.recolte||'',surface:Math.max(0,+F.surface||0),objectif:Math.max(0,+F.objectif||0),prix:Math.max(0,+F.prix||0),statut:F.statut});if(!o.parcelle)throw new Error('Choisissez une parcelle');await commit('cycles',o,id?'modification campagne':'nouvelle campagne',o.culture);closeSheet();render();cycleView(o.id);break}
+    case 'ffop':await saveFop(F);break;
+    case 'fproj':{const id=f.dataset.id;if(F.fin<F.debut)throw new Error('La fin est avant le début');const o=id?JSON.parse(JSON.stringify(byId('projects',id))):{id:uid()};Object.assign(o,{nom:F.nom.slice(0,100),act:F.act,resp:F.resp,debut:F.debut,fin:F.fin,statut:F.statut,budget:Math.max(0,+F.budget||0),client:F.client||'',desc:(F.desc||'').slice(0,800)});await commit('projects',o,id?'modification projet':'nouveau projet',o.nom);closeSheet();sub.pid=o.id;go('projet');break}
+    case 'ftask':await saveTask(f,F);break;
     case 'frole':{const id=f.dataset.id;const r=id?JSON.parse(JSON.stringify(byId('roles',id))):{id:'r_'+uid()};r.nom=F.nom.trim().slice(0,40);if(ROLES.includes(r.nom))throw new Error('Nom réservé');r.perms={};for(const [p] of PERMS)if(F['p_'+p])r.perms[p]=true;await commit('roles',r,id?'modification rôle':'nouveau rôle',r.nom);closeSheet();render();toast('Rôle enregistré');break}
     case 'fclose':{const m=F.m;if(!ask('Clôturer définitivement jusqu\'au '+dfr(lastDay(m))+' ? Cette action est irréversible.'))return;await closePeriod(m);render();toast('Période clôturée');break}
     case 'fset':{const s=JSON.parse(JSON.stringify(D.settings));for(const k of ['nom','adresse','rccm','idnat','nif','tel','email','mentions'])s[k]=(F[k]||'').slice(0,500);for(const k of ['taux','tva','cnssSal','cnssPat','inpp','onem'])s[k]=Math.max(0,+F[k]||0);if(!(s.taux>0))throw new Error('Taux invalide');s.tvaDefaut=!!F.tvaDefaut;await commitSettings(s,'réglages','');render();toast('Réglages enregistrés');break}
