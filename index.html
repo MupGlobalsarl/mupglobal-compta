@@ -239,7 +239,7 @@ const TR=c=>TRESO.find(t=>t[0]===c);
 const isTreso=c=>!!TR(c);
 const JR={CA:'Caisse',BQ:'Banque',MM:'Mobile money',AC:'Achats',VE:'Ventes',PA:'Paie',OD:'Opérations diverses',AN:'À-nouveaux'};
 const STK={'311':{l:'Marchandises',ach:'601',v:'6031'},'321':{l:'Matières premières',ach:'602',v:'6032'},'331':{l:'Fournitures consommables',ach:'604',v:'6033'},'361':{l:'Produits finis',ach:null,v:'736'}};
-const COLL=['users','roles','accounts','acts','tiers','items','emps','docs','entries','pays','slips','moves','assets','recs','projects','tasks','parcels','cycles','farmops','log'];
+const COLL=['users','roles','accounts','acts','tiers','items','emps','docs','entries','pays','slips','moves','assets','recs','projects','tasks','parcels','cycles','farmops','bandes','pouops','log'];
 const ROLES=['Gérant','Comptable','Saisie'];
 
 /* ============ ÉTAT ============ */
@@ -253,8 +253,8 @@ const live=a=>a.filter(x=>!x.del);
 const byId=(c,id)=>id?D[c].find(x=>x.id===id):undefined;
 const meU=()=>byId('users',ME);
 const role=()=>meU()?.role||'Saisie';
-const PERMS=[['valider','Valider les écritures, émettre factures et avoirs, encaisser, contrepasser'],['etats','Voir le tableau de bord et les états financiers'],['paie','Gérer les employés et la paie'],['stocks','Gérer les stocks (articles et mouvements)'],['immo','Immobilisations et rapprochement bancaire'],['tiers','Créer et modifier clients et fournisseurs'],['projets','Créer et piloter les projets et les tâches'],['ferme','Ferme maraîchère : parcelles, campagnes, opérations']];
-const BUILTIN={'Gérant':null,'Comptable':null,'Saisie':['stocks','tiers','ferme']};
+const PERMS=[['valider','Valider les écritures, émettre factures et avoirs, encaisser, contrepasser'],['etats','Voir le tableau de bord et les états financiers'],['paie','Gérer les employés et la paie'],['stocks','Gérer les stocks (articles et mouvements)'],['immo','Immobilisations et rapprochement bancaire'],['tiers','Créer et modifier clients et fournisseurs'],['projets','Créer et piloter les projets et les tâches'],['ferme','Ferme maraîchère : parcelles, campagnes, opérations'],['poulets','Poulets de chair : bandes et registre d\'élevage']];
+const BUILTIN={'Gérant':null,'Comptable':null,'Saisie':['stocks','tiers','ferme','poulets']};
 function perm(p,u){u=u||meU();if(!u)return false;const r=u.role;if(r==='Gérant'||r==='Comptable')return true;if(r==='Saisie')return BUILTIN.Saisie.includes(p);const ro=D.roles&&D.roles.find(x=>x.id===r&&!x.del);return !!(ro&&ro.perms&&ro.perms[p])}
 const roleName=r=>BUILTIN[r]!==undefined?r:((D.roles||[]).find(x=>x.id===r)||{}).nom||'Rôle supprimé';
 const isAdmin=()=>perm('valider');
@@ -359,6 +359,8 @@ function canWrite(u,c,r,old){
     case 'tasks':if(perm('projets',u))break;if(old&&old.resp===u.id&&sameExcept(old,r,['av','note']))break;return 'droit « projets » requis (ou tâche qui vous est attribuée)';
     case 'parcels':case 'cycles':if(!perm('ferme',u))return 'droit « ferme » requis';break;
     case 'farmops':if(!perm('ferme',u))return 'droit « ferme » requis';if(old&&!adm&&!own)return 'modification réservée à son auteur';break;
+    case 'bandes':if(!perm('poulets',u))return 'droit « poulets » requis';break;
+    case 'pouops':if(!perm('poulets',u))return 'droit « poulets » requis';if(old&&!adm&&!own)return 'modification réservée à son auteur';break;
     case 'recs':
       if(!perm('immo',u))return 'droit « rapprochement » requis';
       if(old)return 'rapprochement validé intangible';
@@ -437,7 +439,7 @@ function validRec(c,r){
   if(['entries','pays','moves'].includes(c)&&!RX.date.test(r.date||''))return false;
   if(c==='docs'&&!RX.date.test(r.date||''))return false;
   if(c==='slips'&&!RX.mois.test(r.mois||''))return false;
-  if((c==='assets'||c==='recs'||c==='farmops')&&!RX.date.test(r.date||''))return false;
+  if((c==='assets'||c==='recs'||c==='farmops'||c==='bandes'||c==='pouops')&&!RX.date.test(r.date||''))return false;
   if((c==='tasks'||c==='projects')&&!(RX.date.test(r.debut||'')&&RX.date.test(r.fin||'')))return false;
   if(c==='cycles'&&!RX.date.test(r.semis||''))return false;
   if(c==='recs'&&!Array.isArray(r.points))return false;
@@ -762,6 +764,7 @@ function alertes(){
   for(const [c,l] of TRESO.filter(t=>t[3]!=='CA')){if(!posted().some(e=>e.lines.some(x=>x.c===c)))continue;const last=live(D.recs).filter(r=>r.compte===c).sort((a,b)=>b.date.localeCompare(a.date))[0];if(!last||last.date<addDays(t,-35))a.push(['o',`${l} : aucun rapprochement bancaire depuis ${last?dfr(last.date):'le début'}`,'etats'])}
   if(t.slice(5,7)==='12'&&live(D.assets).some(x=>x.st==='V'&&+x.duree>0)&&!posted().some(e=>e.src?.type==='dotation'&&e.src.ref==t.slice(0,4)&&!isReversed(e.id)))a.push(['o','Dotations aux amortissements '+t.slice(0,4)+' à générer','stocks']);
   if(SRV()&&SYNC.err)a.push(['r','Synchronisation serveur en erreur : '+esc(SYNC.err),'reglages']);
+  for(const b of live(D.bandes).filter(b=>b.statut!=='Clôturée')){const s=bandeStats(b);if(s.lastM&&s.init&&s.lastM[1]/s.init>0.01&&s.lastM[0]>=addDays(t,-2))a.push(['r',`${esc(b.nom)} : mortalité de ${fmtQ(s.lastM[1])} sujets le ${dfr(s.lastM[0])} (plus de 1 %)`,'activites']);if(s.age>(+b.duree||42)+7)a.push(['o',`${esc(b.nom)} a ${s.age} jours : au-delà de la durée prévue`,'activites'])}
   {const myLate=live(D.tasks).filter(x=>x.resp===ME&&(+x.av||0)<100&&x.fin<t);if(myLate.length)a.push(['r',`${myLate.length} tâche(s) qui vous sont attribuées sont en retard`,'projets'])}
   const lm=new Date();lm.setDate(0);const prevM=lm.toLocaleDateString('sv-SE').slice(0,7);
   if(isGerant()&&lockDate()<lastDay(prevM))a.push(['o',`Le mois de ${MOISL[+prevM.slice(5)-1]} n'est pas encore clôturé`,'reglages']);
@@ -1261,7 +1264,8 @@ function pilotage(){
   const plate=projs.filter(p=>projStats(p).late>0||p.fin<t).length;
   const cyc=live(D.cycles).filter(c=>c.statut!=='Clôturée');let kg=0;for(const c of cyc)kg+=cycleStats(c).kg;
   return `<div class="agrid">
-  <div class="acard" data-go="activites"><h4>Ferme maraîchère</h4><div class="kpi" style="border:0;padding:0"><div class="v">${fmtQ(kg)} kg</div><div class="l">récoltés · ${cyc.length} campagne(s) en cours</div></div></div>
+  <div class="acard" data-go="activites" data-sub3="ferme"><h4>Ferme maraîchère</h4><div class="kpi" style="border:0;padding:0"><div class="v">${fmtQ(kg)} kg</div><div class="l">récoltés · ${cyc.length} campagne(s) en cours</div></div></div>
+  ${(()=>{let ef=0,m=0,i=0;for(const b of live(D.bandes)){const s=bandeStats(b);if(b.statut!=='Clôturée')ef+=s.eff;m+=s.mort;i+=s.init}return `<div class="acard" data-go="activites" data-sub3="poulets"><h4>Poulets de chair</h4><div class="kpi" style="border:0;padding:0"><div class="v">${fmtQ(ef)} sujets</div><div class="l ${i&&m/i>0.05?'neg':''}">mortalité ${i?fmt(m/i*100):'0,00'} %</div></div></div>`})()}
   <div class="acard" data-go="projets"><h4>Projets</h4><div class="kpi" style="border:0;padding:0"><div class="v">${projs.length} actif(s)</div><div class="l ${plate?'neg':''}">${plate?plate+' en retard':'aucun retard'}</div></div></div>
   <div class="acard" data-go="projets" data-sub2="mine"><h4>Mes tâches</h4><div class="kpi" style="border:0;padding:0"><div class="v">${my.length} ouverte(s)</div><div class="l ${late?'neg':''}">${late?late+' en retard':'à jour'}</div></div></div>
   </div>`;
@@ -1287,9 +1291,9 @@ function cycleStats(c){
 function weekKey(d){const x=new Date(d+'T12:00:00');const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);return x.toLocaleDateString('sv-SE')}
 function activites(){
   const a=sub.act||'ferme';
-  const tabs=[['ferme','Ferme maraîchère',1],['poulets','Poulets de chair',0],['elec','Électricité & solaire',0],['couture','Couture & peinture',0]];
+  const tabs=[['ferme','Ferme maraîchère',1],['poulets','Poulets de chair',1],['elec','Électricité & solaire',0],['couture','Couture & peinture',0]];
   return `<h2>Activités</h2><div class="seg">${tabs.map(([k,l,on])=>`<button class="${a===k?'on':''} ${on?'':'soon'}" data-act="sub" data-k="act" data-v="${k}">${l}</button>`).join('')}</div>
-  ${a==='ferme'?fermeView():`<div class="card"><b>${esc(tabs.find(x=>x[0]===a)[1])}</b><p class="muted">Ce module arrive dans une prochaine étape. En attendant, ses opérations se saisissent dans « Saisir » avec l'activité correspondante, et sa rentabilité apparaît dans les états.</p></div>`}`;
+  ${a==='ferme'?fermeView():a==='poulets'?poulView():`<div class="card"><b>${esc(tabs.find(x=>x[0]===a)[1])}</b><p class="muted">Ce module arrive dans une prochaine étape. En attendant, ses opérations se saisissent dans « Saisir » avec l'activité correspondante, et sa rentabilité apparaît dans les états.</p></div>`}`;
 }
 function fermeView(){
   const ps=live(D.parcels),cs=live(D.cycles).sort((x,y)=>y.semis.localeCompare(x.semis)),can=perm('ferme');
@@ -1366,6 +1370,107 @@ async function saveFop(F){
     const e={id:uid(),date:o.date,jr:TR(F.pay)[3],piece:'FERME',lib:lib.slice(0,200),act:farmAct(),lines,src:{type:'ferme',ref:o.id},st:isAdmin()?'V':'B'};
     await commit('entries',e,e.st==='V'?'saisie validée':'brouillon',e.lib);o.entryId=e.id}
   await commit('farmops',o,'opération ferme',FOPS[o.type]+' '+(o.lib||''));closeSheet();render();cycleView(o.cycle);toast('Opération enregistrée');
+}
+
+/* ============ ACTIVITÉS : POULETS DE CHAIR ============ */
+const POPS={M:'Mortalité',A:'Aliment',S:'Soins, vaccins',P:'Pesée',D:'Autre dépense',V:'Vente'};
+const POPACC={A:'602',S:'604',D:'638'};
+const BSTAT=['En élevage','En vente','Clôturée'];
+/* Poids vif moyen indicatif d'un poulet de chair (kg) selon l'âge en jours — repère de type Cobb/Ross, à adapter */
+const STDW=[[0,0.04],[7,0.18],[14,0.45],[21,0.9],[28,1.45],[35,2.05],[42,2.65],[49,3.2]];
+const stdAt=d=>{for(let i=1;i<STDW.length;i++){const [a,x]=STDW[i-1],[b,y]=STDW[i];if(d<=b)return x+(y-x)*(d-a)/(b-a)}return STDW.at(-1)[1]};
+function pouAct(){return (live(D.acts).find(a=>/poulet|volaille|élevage/i.test(a.nom))||live(D.acts)[0]||{}).id}
+function bandeStats(b){
+  const ops=live(D.pouops).filter(o=>o.bande===b.id).sort((x,y)=>x.date.localeCompare(y.date));
+  let mort=0,vendus=0,kgv=0,ca=0,alim=0,calim=0,soins=0,autres=0,pw=null,pd='';const pes=[],byDay={};
+  for(const o of ops){if(o.type==='M'){mort+=+o.qte||0;byDay[o.date]=(byDay[o.date]||0)+(+o.qte||0)}else if(o.type==='V'){vendus+=+o.qte||0;kgv+=+o.kg||0;ca+=+o.montant||0}else if(o.type==='A'){alim+=+o.kg||0;calim+=+o.cout||0}else if(o.type==='S')soins+=+o.cout||0;else if(o.type==='D')autres+=+o.cout||0;else if(o.type==='P'){pw=+o.kg||0;pd=o.date;pes.push([dd(b.date,o.date),pw])}}
+  const init=+b.nb||0,eff=Math.max(0,init-mort-vendus),age=dd(b.date,b.statut==='Clôturée'&&b.fin?b.fin:today());
+  const cPous=r2(init*(+b.pu||0)),cost=r2(cPous+calim+soins+autres),bio=pw?eff*pw:0,prod=kgv+bio;
+  const ic=prod>0?alim/prod:0,lastM=Object.entries(byDay).sort().at(-1);
+  return {ops,init,mort,vendus,eff,age,kgv,ca:r2(ca),alim,calim:r2(calim),soins:r2(soins),autres:r2(autres),cPous,cost,pw,pd,pes,bio,ic,
+    tm:init?mort/init*100:0,ckg:kgv?cost/kgv:0,pmoy:kgv?ca/kgv:0,marge:r2(ca-cost),byDay,lastM,std:stdAt(Math.max(0,age))};
+}
+function poulView(){
+  const bs=live(D.bandes).sort((x,y)=>y.date.localeCompare(x.date)),can=perm('poulets'),act=bs.filter(b=>b.statut!=='Clôturée');
+  let eff=0,mort=0,init=0,ca=0,cost=0,kgv=0;for(const b of bs){const s=bandeStats(b);if(b.statut!=='Clôturée')eff+=s.eff;mort+=s.mort;init+=s.init;ca+=s.ca;cost+=s.cost;kgv+=s.kgv}
+  return `<div class="kpis"><div class="kpi"><div class="l">Bandes en cours</div><div class="v">${act.length}</div></div><div class="kpi"><div class="l">Sujets vivants</div><div class="v">${fmtQ(eff)}</div></div>
+  <div class="kpi"><div class="l">Mortalité cumulée</div><div class="v ${init&&mort/init>0.05?'neg':''}">${init?fmt(mort/init*100):'0,00'} %</div></div><div class="kpi"><div class="l">Kg vendus</div><div class="v">${fmtQ(Math.round(kgv))} kg</div></div>
+  <div class="kpi"><div class="l">Ventes</div><div class="v">${money(ca)}</div></div><div class="kpi"><div class="l">Marge</div><div class="v ${ca-cost<0?'neg':''}">${money(ca-cost)}</div></div></div>
+  ${can?`<div class="btns"><button class="pr" data-act="bande">+ Nouvelle bande</button>${act.length?'<button data-act="pop" data-k="M">+ Mortalité</button><button data-act="pop" data-k="A">+ Aliment</button><button data-act="pop" data-k="V">+ Vente</button>':''}</div>`:''}
+  <h3>Bandes</h3>${bs.length?bs.map(b=>{const s=bandeStats(b),dur=+b.duree||42,pc=Math.min(100,s.age/dur*100),late=b.statut!=='Clôturée'&&s.age>dur+7;
+    return `<div class="card" data-act="openBande" data-id="${esc(b.id)}" style="cursor:pointer"><div class="top"><b>${esc(b.nom)}</b><span class="tag ${b.statut==='Clôturée'?'':late?'r':'g'}">${late?'Dépasse la durée prévue':esc(b.statut)}</span></div>
+    <div class="small muted">Arrivée ${dfr(b.date)} · ${fmtQ(s.init)} poussins${b.souche?' · '+esc(b.souche):''} · âge ${s.age} j / ${dur} j${b.batiment?' · '+esc(b.batiment):''}</div>
+    <div class="prog" style="margin:8px 0"><i style="width:${pc.toFixed(0)}%"></i></div>
+    <div class="small">Vivants <b>${fmtQ(s.eff)}</b> · mortalité <b class="${s.tm>5?'neg':''}">${fmt(s.tm)} %</b> · poids moyen <b>${s.pw?fmt(s.pw)+' kg':'—'}</b>${s.pw?` (repère ${fmt(s.std)} kg)`:''} · IC <b>${s.ic?fmt(s.ic):'—'}</b> · marge <b class="${s.marge<0?'neg':''}">${money(s.marge)}</b></div></div>`}).join(''):'<p class="empty">Créez votre première bande : date d\'arrivée, nombre de poussins et prix unitaire.</p>'}
+  <p class="small muted">IC (indice de consommation) = kg d'aliment ÷ kg de poids vif produit (vendu + en élevage). Plus il est bas, mieux c'est : autour de 1,6 à 1,9 pour une bande bien conduite. Le poids « repère » est une courbe indicative de souche commerciale, à adapter à vos poussins.</p>`;
+}
+function bandeForm(id){const b=id?byId('bandes',id):{id:'',nom:'Bande '+(live(D.bandes).length+1),date:today(),nb:500,souche:'',pu:0,batiment:'',duree:42,statut:'En élevage'};
+  openSheet(`<h2>${id?'Modifier la bande':'Nouvelle bande'}</h2><form id="fbande" data-id="${esc(b.id)}">
+  <div class="row2"><label class="f">Nom<input name="nom" value="${esc(b.nom)}" required maxlength="60"></label><label class="f">Date d'arrivée des poussins<input type="date" name="date" value="${esc(b.date)}" required></label></div>
+  <div class="row2"><label class="f">Nombre de poussins<input type="number" name="nb" step="1" min="1" value="${esc(b.nb)}" required></label><label class="f">Prix d'un poussin (${BASE()})<input type="number" name="pu" step="0.01" min="0" value="${esc(b.pu||'')}"></label></div>
+  <div class="row2"><label class="f">Souche<input name="souche" value="${esc(b.souche)}" maxlength="40" placeholder="Cobb 500, Ross 308…"></label><label class="f">Bâtiment<input name="batiment" value="${esc(b.batiment)}" maxlength="40"></label></div>
+  <div class="row2"><label class="f">Durée d'élevage prévue (jours)<input type="number" name="duree" step="1" min="20" max="120" value="${esc(b.duree||42)}"></label><label class="f">Statut<select name="statut">${BSTAT.map(x=>`<option ${x===b.statut?'selected':''}>${x}</option>`).join('')}</select></label></div>
+  ${!id?`<label class="f">Enregistrer l'achat des poussins en comptabilité<select name="pay"><option value="">Non</option>${TRESO.filter(t=>t[2]===BASE()).map(([c,l])=>`<option value="${c}">Oui — payé par ${l}</option>`).join('')}</select></label>`:''}
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+function bandeView(id){const b=byId('bandes',id),s=bandeStats(b),can=perm('poulets');
+  // courbe de croissance : pesées vs repère
+  const maxD=Math.max(+b.duree||42,s.age,...s.pes.map(p=>p[0]),7),maxW=Math.max(stdAt(maxD),...s.pes.map(p=>p[1]),0.5)*1.1;
+  const X=d=>(d/maxD*100).toFixed(2),Y=w=>(100-w/maxW*100).toFixed(2);
+  let std='';for(let d=0;d<=maxD;d+=1)std+=(d?' L':'M')+X(d)+' '+Y(stdAt(d));
+  const pts=s.pes.map(([d,w])=>`<circle cx="${X(d)}" cy="${Y(w)}" r="1.6" fill="var(--ink)"><title>${d} j : ${fmt(w)} kg</title></circle>`).join('');
+  const line=s.pes.length>1?'M'+s.pes.map(([d,w])=>X(d)+' '+Y(w)).join(' L'):'';
+  // mortalité par semaine d'âge
+  const wk={};for(const [d,n] of Object.entries(s.byDay)){const w=Math.floor(dd(b.date,d)/7)+1;wk[w]=(wk[w]||0)+n}const nW=Math.max(1,Math.ceil(Math.max(s.age,+b.duree||42)/7)),mw=Math.max(1,...Object.values(wk));
+  const ops=s.ops.slice().reverse();
+  openSheet(`<h2>${esc(b.nom)} <span class="tag">${esc(b.statut)}</span></h2><p class="small muted">Arrivée ${dfr(b.date)} · âge ${s.age} jours · ${fmtQ(s.init)} poussins${b.souche?' '+esc(b.souche):''}</p>
+  <div class="kpis"><div class="kpi"><div class="l">Vivants</div><div class="v">${fmtQ(s.eff)}</div></div><div class="kpi"><div class="l">Mortalité</div><div class="v ${s.tm>5?'neg':''}">${fmtQ(s.mort)} (${fmt(s.tm)} %)</div></div>
+  <div class="kpi"><div class="l">Poids moyen</div><div class="v">${s.pw?fmt(s.pw)+' kg':'—'}</div></div><div class="kpi"><div class="l">Aliment consommé</div><div class="v">${fmtQ(Math.round(s.alim))} kg</div></div>
+  <div class="kpi"><div class="l">Indice de consommation</div><div class="v">${s.ic?fmt(s.ic):'—'}</div></div><div class="kpi"><div class="l">Poids vif en élevage</div><div class="v">${fmtQ(Math.round(s.bio))} kg</div></div>
+  <div class="kpi"><div class="l">Vendus</div><div class="v">${fmtQ(s.vendus)} · ${fmtQ(Math.round(s.kgv))} kg</div></div><div class="kpi"><div class="l">Prix moyen</div><div class="v">${s.kgv?money(s.pmoy)+'/kg':'—'}</div></div>
+  <div class="kpi"><div class="l">Coût total</div><div class="v">${money(s.cost)}</div></div><div class="kpi"><div class="l">Coût par kg vendu</div><div class="v">${s.kgv?money(s.ckg):'—'}</div></div>
+  <div class="kpi"><div class="l">Ventes</div><div class="v">${money(s.ca)}</div></div><div class="kpi"><div class="l">Marge</div><div class="v ${s.marge<0?'neg':''}">${money(s.marge)}</div></div></div>
+  <h3>Courbe de croissance</h3><div style="position:relative;height:190px;border-left:1px solid var(--ln);border-bottom:1px solid var(--ln);margin:0 0 4px 34px">
+   <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible"><path d="${std}" fill="none" stroke="var(--sl)" stroke-width="0.8" stroke-dasharray="2 1.5" vector-effect="non-scaling-stroke"/>${line?`<path d="${line}" fill="none" stroke="var(--ink)" stroke-width="2" vector-effect="non-scaling-stroke"/>`:''}${pts}<line x1="${X(s.age)}" x2="${X(s.age)}" y1="0" y2="100" stroke="var(--rd)" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>
+   <span class="small muted" style="position:absolute;left:-34px;top:-8px">${fmt(maxW)}</span><span class="small muted" style="position:absolute;left:-20px;bottom:-8px">0</span></div>
+  <div class="vlab" style="margin-left:34px"><span style="text-align:left">0 j</span><span style="text-align:right">${maxD} j</span></div>
+  <div class="legend"><span><i style="background:var(--ink)"></i>Pesées</span><span><i style="background:var(--sl)"></i>Repère indicatif</span><span><i style="background:var(--rd)"></i>Aujourd'hui</span></div>
+  <h3>Mortalité par semaine d'âge</h3><div class="vbars" style="height:110px">${Array.from({length:nW},(_,i)=>`<button style="height:${W(wk[i+1]||0,mw)};background:var(--rd)" title="Semaine ${i+1} : ${fmtQ(wk[i+1]||0)} sujets"></button>`).join('')}</div>
+  <div class="vlab">${Array.from({length:nW},(_,i)=>`<span>S${i+1}</span>`).join('')}</div>
+  <div class="btns" style="margin-top:14px">${can&&b.statut!=='Clôturée'?Object.entries(POPS).map(([k,l])=>`<button class="${k==='M'?'pr':''}" data-act="pop" data-k="${k}" data-c="${esc(id)}">+ ${l}</button>`).join(''):''}${can?`<button class="ghost" data-act="bande" data-id="${esc(id)}">Modifier</button>`:''}<button class="ghost" data-act="close">Fermer</button></div>
+  <h3>Registre d'élevage</h3>${ops.map(o=>`<div class="card"><div class="top"><span><b>${esc(POPS[o.type])}</b> · ${dfr(o.date)} · ${dd(b.date,o.date)} j</span><span class="amt">${o.type==='M'?fmtQ(o.qte)+' sujet(s)':o.type==='P'?fmt(o.kg)+' kg':o.type==='V'?money(o.montant):o.type==='A'?fmtQ(o.kg)+' kg':money(o.cout)}</span></div>
+   <div class="small muted">${esc(o.lib||'')}${o.type==='V'?` ${fmtQ(o.qte)} sujets · ${fmt(o.kg)} kg${o.kg?' · '+money(o.montant/o.kg)+'/kg':''}`:''}${o.type==='A'&&o.cout?' · '+money(o.cout):''}${o.entryId?' · comptabilisé':''} · ${esc(userNom(o.cr))}</div>${(isAdmin()||o.cr===ME)?`<button class="dg" style="margin-top:6px" data-act="delPop" data-id="${esc(o.id)}">Supprimer</button>`:''}</div>`).join('')||'<p class="muted">Aucune opération.</p>'}`)}
+function popForm(type,bid){const bs=live(D.bandes).filter(b=>b.statut!=='Clôturée'||b.id===bid);if(!bs.length)return toast('Créez d\'abord une bande');type=type||'M';
+  const hint={M:'Nombre de sujets morts ce jour',A:'Kilos d\'aliment livrés ou distribués, et leur coût',S:'Vaccin, vitamine, traitement, vétérinaire',P:'Poids moyen d\'un échantillon de sujets',D:'Litière, gaz, électricité, transport…',V:'Sujets vendus, kilos et montant'};
+  openSheet(`<h2>${esc(POPS[type])}</h2><p class="small muted">${hint[type]}</p><form id="fpop" data-k="${type}">
+  <div class="row2"><label class="f">Bande<select name="bande">${bs.map(b=>`<option value="${esc(b.id)}" ${b.id===bid?'selected':''}>${esc(b.nom)}</option>`).join('')}</select></label><label class="f">Date<input type="date" name="date" value="${today()}" required></label></div>
+  ${type==='M'||type==='V'?`<label class="f">Nombre de sujets<input type="number" name="qte" step="1" min="1" required inputmode="numeric"></label>`:''}
+  ${type==='A'||type==='P'||type==='V'?`<label class="f">${type==='P'?'Poids moyen par sujet (kg)':type==='V'?'Kilos vendus (poids total)':'Kilos d\'aliment'}<input type="number" name="kg" step="0.01" min="0.01" required inputmode="decimal"></label>`:''}
+  ${type==='V'?`<div class="row2"><label class="f">Prix au kilo (${BASE()})<input type="number" name="pk" step="0.01" min="0" inputmode="decimal"></label><label class="f">ou montant total (${BASE()})<input type="number" name="montant" step="0.01" min="0" inputmode="decimal"></label></div>`:''}
+  ${type==='A'||type==='S'||type==='D'?`<label class="f">Coût (${BASE()})<input type="number" name="cout" step="0.01" min="0" inputmode="decimal" ${type==='A'?'':'required'}></label>`:''}
+  <label class="f">Note<input name="lib" maxlength="120" placeholder="${type==='M'?'Cause probable':type==='A'?'Démarrage, croissance, finition':type==='V'?'Client, marché':''}"></label>
+  ${type==='A'||type==='S'||type==='D'||type==='V'?`<label class="f">Enregistrer aussi en comptabilité<select name="pay"><option value="">Non</option>${TRESO.filter(t=>t[2]===BASE()).map(([c,l])=>`<option value="${c}">Oui — ${l}</option>`).join('')}</select></label>`:''}
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function savePop(type,F){
+  const o={id:uid(),bande:F.bande,type,date:F.date,lib:(F.lib||'').slice(0,120),qte:Math.max(0,Math.round(+F.qte||0)),kg:Math.max(0,+F.kg||0),cout:r2(Math.max(0,+F.cout||0)),montant:0};
+  const b=byId('bandes',o.bande),s=bandeStats(b);
+  if((type==='M'||type==='V')&&!(o.qte>0))throw new Error('Nombre de sujets invalide');
+  if((type==='M'||type==='V')&&o.qte>s.eff)throw new Error('Plus que l\'effectif vivant ('+fmtQ(s.eff)+')');
+  if(type==='V'){o.montant=r2(+F.montant||(+F.pk||0)*o.kg);if(!(o.montant>0))throw new Error('Indiquez le prix au kilo ou le montant')}
+  if((type==='S'||type==='D')&&!(o.cout>0))throw new Error('Indiquez le coût');
+  const amt=type==='V'?o.montant:o.cout;
+  if(F.pay&&amt>0){const acc=type==='V'?'702':POPACC[type],cur=TR(F.pay)[2],lib=(type==='V'?'Vente poulets ':POPS[type]+' ')+b.nom+(o.lib?' — '+o.lib:'');
+    const lines=type==='V'?[{c:F.pay,d:amt,k:0,t:'',fx:{cur,a:amt}},{c:acc,d:0,k:amt,t:''}]:[{c:acc,d:amt,k:0,t:''},{c:F.pay,d:0,k:amt,t:'',fx:{cur,a:amt}}];
+    const e={id:uid(),date:o.date,jr:TR(F.pay)[3],piece:'ELEV',lib:lib.slice(0,200),act:pouAct(),lines,src:{type:'poulets',ref:o.id},st:isAdmin()?'V':'B'};
+    await commit('entries',e,e.st==='V'?'saisie validée':'brouillon',e.lib);o.entryId=e.id}
+  await commit('pouops',o,'élevage',POPS[type]+' '+b.nom);
+  const s2=bandeStats(b);if(s2.eff===0&&b.statut!=='Clôturée'){const c=JSON.parse(JSON.stringify(b));c.statut='Clôturée';c.fin=o.date;await commit('bandes',c,'bande clôturée',b.nom)}
+  closeSheet();render();bandeView(b.id);toast(type==='M'&&s.init&&o.qte/s.init>0.01?'Mortalité élevée ce jour (plus de 1 %) : vérifiez le lot':'Enregistré');
+}
+async function saveBande(f,F){
+  const id=f.dataset.id;const b=id?JSON.parse(JSON.stringify(byId('bandes',id))):{id:uid()};
+  Object.assign(b,{nom:F.nom.slice(0,60),date:F.date,nb:Math.max(1,Math.round(+F.nb||0)),pu:r2(Math.max(0,+F.pu||0)),souche:(F.souche||'').slice(0,40),batiment:(F.batiment||'').slice(0,40),duree:Math.max(20,Math.round(+F.duree||42)),statut:F.statut});
+  if(!id&&F.pay&&b.pu>0){const amt=r2(b.nb*b.pu),cur=TR(F.pay)[2];const e={id:uid(),date:b.date,jr:TR(F.pay)[3],piece:'ELEV',lib:'Achat de '+b.nb+' poussins — '+b.nom,act:pouAct(),lines:[{c:'602',d:amt,k:0,t:''},{c:F.pay,d:0,k:amt,t:'',fx:{cur,a:amt}}],src:{type:'poulets',ref:b.id},st:isAdmin()?'V':'B'};await commit('entries',e,'achat poussins',e.lib);b.entryId=e.id}
+  await commit('bandes',b,id?'modification bande':'nouvelle bande',b.nom);closeSheet();render();bandeView(b.id);
 }
 
 /* ============ PROJETS, TÂCHES ET GANTT ============ */
@@ -1598,7 +1703,7 @@ let busy=false;
 async function run(fn){if(busy)return;busy=true;try{await fn()}catch(x){toast(x.message||'Erreur');console.warn(x)}finally{busy=false}}
 document.addEventListener('click',ev=>{
   const g=ev.target.closest('[data-go]');
-  if(g){if(!D)return;if(g.dataset.sub)sub.etat=g.dataset.sub;if(g.dataset.sub2)sub.pv=g.dataset.sub2;closeSheet();go(g.dataset.go);return}
+  if(g){if(!D)return;if(g.dataset.sub)sub.etat=g.dataset.sub;if(g.dataset.sub2)sub.pv=g.dataset.sub2;if(g.dataset.sub3)sub.act=g.dataset.sub3;closeSheet();go(g.dataset.go);return}
   const b=ev.target.closest('[data-act]');if(!b)return;ev.preventDefault();
   const a=b.dataset.act,id=b.dataset.id,k=b.dataset.k;
   const A={
@@ -1639,6 +1744,8 @@ document.addEventListener('click',ev=>{
     parcel:()=>parcelForm(id),cycle:()=>cycleForm(id),openCycle:()=>cycleView(id),fop:()=>fopForm(k||'',b.dataset.c||''),
     delFop:async()=>{if(!ask('Supprimer cette opération ? Son écriture comptable éventuelle n\'est pas supprimée.'))return;const o=JSON.parse(JSON.stringify(byId('farmops',id)));o.del=true;await commit('farmops',o,'suppression opération ferme',o.lib);const c=o.cycle;render();cycleView(c)},
     fweek:()=>{sub.fweek=sub.fweek===k?'':k;render()},
+    bande:()=>bandeForm(id),openBande:()=>bandeView(id),pop:()=>popForm(k||'',b.dataset.c||''),
+    delPop:async()=>{if(!ask('Supprimer cette opération ? Son écriture comptable éventuelle n\'est pas supprimée.'))return;const o=JSON.parse(JSON.stringify(byId('pouops',id)));o.del=true;await commit('pouops',o,'suppression opération élevage','');render();bandeView(o.bande)},
     proj:()=>projForm(id),openProj:()=>{sub.pid=id;go('projet')},task:()=>taskForm(id,b.dataset.p||sub.pid),
     zoom:()=>{UI.gz=k;saveUI();render()},
     delTask:async()=>{if(!ask('Supprimer cette tâche ?'))return;const x=JSON.parse(JSON.stringify(byId('tasks',id)));x.del=true;await commit('tasks',x,'suppression tâche',x.nom);closeSheet();render()},
@@ -1744,6 +1851,8 @@ document.addEventListener('submit',ev=>{
     case 'fparc':{const id=f.dataset.id;const o=id?JSON.parse(JSON.stringify(byId('parcels',id))):{id:uid()};Object.assign(o,{nom:F.nom.slice(0,80),surface:Math.max(0,+F.surface||0),lieu:(F.lieu||'').slice(0,120)});await commit('parcels',o,id?'modification parcelle':'nouvelle parcelle',o.nom);closeSheet();render();break}
     case 'fcyc':{const id=f.dataset.id;const o=id?JSON.parse(JSON.stringify(byId('cycles',id))):{id:uid()};Object.assign(o,{parcelle:F.parcelle,culture:F.culture,variete:(F.variete||'').slice(0,60),semis:F.semis,recolte:F.recolte||'',surface:Math.max(0,+F.surface||0),objectif:Math.max(0,+F.objectif||0),prix:Math.max(0,+F.prix||0),statut:F.statut});if(!o.parcelle)throw new Error('Choisissez une parcelle');await commit('cycles',o,id?'modification campagne':'nouvelle campagne',o.culture);closeSheet();render();cycleView(o.id);break}
     case 'ffop':await saveFop(F);break;
+    case 'fbande':await saveBande(f,F);break;
+    case 'fpop':await savePop(f.dataset.k,F);break;
     case 'fproj':{const id=f.dataset.id;if(F.fin<F.debut)throw new Error('La fin est avant le début');const o=id?JSON.parse(JSON.stringify(byId('projects',id))):{id:uid()};Object.assign(o,{nom:F.nom.slice(0,100),act:F.act,resp:F.resp,debut:F.debut,fin:F.fin,statut:F.statut,budget:Math.max(0,+F.budget||0),client:F.client||'',desc:(F.desc||'').slice(0,800)});await commit('projects',o,id?'modification projet':'nouveau projet',o.nom);closeSheet();sub.pid=o.id;go('projet');break}
     case 'ftask':await saveTask(f,F);break;
     case 'frole':{const id=f.dataset.id;const r=id?JSON.parse(JSON.stringify(byId('roles',id))):{id:'r_'+uid()};r.nom=F.nom.trim().slice(0,40);if(ROLES.includes(r.nom))throw new Error('Nom réservé');r.perms={};for(const [p] of PERMS)if(F['p_'+p])r.perms[p]=true;await commit('roles',r,id?'modification rôle':'nouveau rôle',r.nom);closeSheet();render();toast('Rôle enregistré');break}
