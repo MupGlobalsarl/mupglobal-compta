@@ -130,6 +130,7 @@ textarea{min-height:70px}
 .pin{letter-spacing:.35em;font-size:22px;text-align:center}
 .fp{font-family:ui-monospace,Menlo,monospace;font-size:14px;background:var(--pn);padding:2px 6px;border-radius:3px;overflow-wrap:anywhere}
 #print{display:none}
+body.demo header{box-shadow:inset 0 5px 0 var(--y)}body.demo header h1 small::after{content:' · DÉMO, données fictives';color:var(--rd);font-weight:800}
 .kpis.sm .v{font-size:clamp(16px,4.6vw,22px)}
 .doc.rap h2{font-size:15px;margin:18px 0 8px;padding-bottom:3px;border-bottom:2px solid #101418;break-after:avoid}.doc.rap h3{font-size:13px;margin:12px 0 6px}.doc.rap ul{margin:0 0 6px;padding-left:18px}.doc.rap li{margin-bottom:4px}.doc.rap table{width:100%;border-collapse:collapse;break-inside:avoid}.doc.rap th{text-align:left;border-bottom:2px solid #101418;font-size:11px}.doc.rap .legend{color:#333;font-size:11px}.doc.rap svg{break-inside:avoid}
 @media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:8px;border-bottom:1px solid var(--ln)}.stack td{display:flow-root;border:0;padding:2px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;color:var(--sl);font-weight:600}.stack td:empty{display:none}.stack td.n{text-align:start}}
@@ -173,7 +174,7 @@ textarea{min-height:70px}
    MupGlobal Compta V2 — comptabilité SYSCOHADA sécurisée, hors ligne
    ===================================================================== */
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const SKEY='mgc2', UIKEY='mgc2_ui', V1KEY='mgcompta_v1', V1LKEY='mgcompta_local';
+const DEMO=/[?&]demo(=|&|$)/.test(location.search), SKEY=DEMO?'mgc2_demo':'mgc2', UIKEY=DEMO?'mgc2_demo_ui':'mgc2_ui', V1KEY='mgcompta_v1', V1LKEY='mgcompta_local';
 const uid=()=>Date.now().toString(36)+[...crypto.getRandomValues(new Uint8Array(6))].map(b=>b.toString(36).padStart(2,'0')).join('').slice(0,9);
 const r2=x=>Math.round((+x||0)*100)/100;
 const esc=s=>String(s??'').replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));
@@ -585,6 +586,7 @@ function montantLettres(x,cur){x=r2(x);const e=Math.floor(x),c=Math.round((x-e)*
 let view=UI.view||'accueil';const sub={};
 function go(v){view=v;UI.view=v;saveUI();render();window.scrollTo(0,0)}
 function render(){
+  if(SEEDING)return;document.body.classList.toggle('demo',DEMO);
   if(!D){document.body.classList.add('locked');$('#app').innerHTML=HDR?lockScreen():setupScreen();return}
   document.body.classList.remove('locked');
   const NV={stocks:'plus',paie:'plus',etats:'plus',reglages:'plus',projet:'projets',commande:'activites',direction:'plus',achats:'plus',lot:'activites'}[view]||view;
@@ -599,7 +601,7 @@ function closeSheet(){$('#ov').classList.remove('on');$('#sheet').innerHTML=''}
 
 /* ============ VERROUILLAGE, CRÉATION, ADHÉSION ============ */
 function lockScreen(){
-  return `<div class="lock"><div class="seal"><span class="small">Comptabilité protégée</span><b>${esc(HDR.company||'MupGlobal SARL')}</b></div>
+  return `<div class="lock">${DEMO?'<p class="small" style="background:var(--y);color:var(--yi);padding:8px;border-radius:4px"><b>Démonstration</b> · données fictives · PIN : <b>000000</b> · <a href="./" style="color:inherit">revenir à ma société</a></p>':''}<div class="seal"><span class="small">Comptabilité protégée</span><b>${esc(HDR.company||'MupGlobal SARL')}</b></div>
   <form id="flogin"><label class="f">Utilisateur<select name="u">${HDR.users.map(u=>`<option value="${esc(u.id)}" ${u.id===UI.lastUser?'selected':''}>${esc(u.nom)}</option>`).join('')}</select></label>
   <label class="f">Code PIN<input class="pin" type="password" name="pin" inputmode="numeric" autocomplete="current-password" required minlength="6"></label>
   <div class="btns"><button class="pr" type="submit" style="flex:1">Déverrouiller</button></div></form>
@@ -607,7 +609,9 @@ function lockScreen(){
 </div>`;
 }
 function setupScreen(){
+  if(DEMO)return `<div class="lock"><div class="seal"><span class="small">Démonstration</span><b>MupGlobal Compta</b></div><p>La démonstration crée sur ce téléphone une société <b>fictive</b>, déjà remplie d'exemples pour chaque rubrique : ferme, poulets, pisciculture, chantiers solaires, couture, peinture, projets, achats, paie, budgets et rapports.</p><p class="small muted">Elle est séparée de votre vraie société : rien n'est partagé, rien n'est synchronisé. PIN de la démo : <b>000000</b>.</p><div class="btns"><button class="pr" data-act="demoStart" style="flex:1">Créer la démonstration (environ 1 minute)</button></div><div class="btns"><button class="ghost" data-act="demoExit">Revenir à ma société</button></div></div>`;
   const v1=localStorage.getItem(V1KEY);
+  const demoLink='<p class="small" style="text-align:center"><a href="./?demo=1">Découvrir l\'application avec une société de démonstration</a></p>';
   return `<div class="lock"><div class="seal"><span class="small">Bienvenue</span><b>MupGlobal Compta</b></div>
   <div class="seg"><button class="${sub.setup!=='join'?'on':''}" data-act="sub" data-k="setup" data-v="new">Créer l'entreprise</button><button class="${sub.setup==='join'?'on':''}" data-act="sub" data-k="setup" data-v="join">Rejoindre (collaborateur)</button></div>
   ${sub.setup==='join'?`<p>Le gérant vous a envoyé un <b>fichier d'invitation</b>, un <b>code entreprise</b> et un <b>PIN provisoire</b>.</p><label class="bt">Choisir le fichier d'invitation<input type="file" id="joinFile" accept="*/*" hidden></label>`:`
@@ -619,7 +623,7 @@ function setupScreen(){
   <p class="small muted">Le code entreprise chiffre et authentifie les fichiers échangés entre téléphones. Vous le donnerez de vive voix à vos collaborateurs. Notez-le en lieu sûr : il ne peut pas être récupéré.</p>
   <div class="row2"><label class="f">Monnaie de tenue des comptes<select name="base"><option value="CDF">CDF — franc congolais (exigé pour la tenue légale)</option><option value="USD" ${v1?'selected':''}>USD — dollar américain</option></select></label><label class="f">Taux du jour (CDF pour 1 USD)<input type="number" name="taux" step="0.01" min="1" value="2850" required></label></div>
   ${v1?`<label class="chk"><input type="checkbox" name="mig" checked> Reprendre les données de la version 1 (en USD) puis les effacer de leur ancien emplacement non chiffré</label>`:''}
-  <div class="btns"><button class="pr" type="submit" style="flex:1">Créer et chiffrer</button></div></form>`}</div>`;
+  <div class="btns"><button class="pr" type="submit" style="flex:1">Créer et chiffrer</button></div></form>`}${demoLink}</div>`;
 }
 async function setupNew(F){
   if(F.pin!==F.pin2)throw new Error('Les deux PIN sont différents');
@@ -813,6 +817,8 @@ function alertes(){
 function accueil(){
   if(!perm('etats')){const mine=live(D.entries).filter(e=>e.cr===ME&&e.st==='B');return pilotage()+`<h2>Bonjour ${esc(meU().nom.split(' ')[0])}</h2><p class="muted">${isAdmin()?'':'Vos opérations sont validées par le gérant ou le comptable.'}</p><div class="btns"><button class="pr" data-act="quick" data-k="vente">+ Recette</button><button class="pr" data-act="quick" data-k="depense">+ Dépense</button><button data-act="doc" data-k="D">+ Devis</button></div><h3>Mes brouillons en attente (${mine.length})</h3>${mine.map(entryCard).join('')||'<p class="muted">Aucun.</p>'}`}
   const y=EX(),R=resultat(bEx(y)),fx=tresoFx(),all=bTo('9999-12-31');
+  if(DEMO&&!UI.tourHidden)return demoTour()+accueilBody(y,R,fx,all);return accueilBody(y,R,fx,all)}
+function accueilBody(y,R,fx,all){
   const cli=solde(all,['411']),four=solde(all,['401'],'C');
   const tB=r2(TRESO.reduce((s,[c,,cur])=>s+toBase(fx[c]||0,cur),0));
   const oth=BASE()==='CDF'?'USD':'CDF';
@@ -1321,7 +1327,8 @@ function pilotage(){
 }
 function plusView(){
   const T=[['direction','Direction','Tableau de bord interactif, budgets, objectifs, rapports PDF'],['achats','Achats','Demandes, approbations, bons de commande, réceptions'],['stocks','Actifs','Stocks, immobilisations'],['paie','Paie','Employés, bulletins'],['etats','États financiers','Bilan, résultat, journal, TVA, rapprochement'],['reglages','Réglages','Synchronisation, utilisateurs, rôles, clôture, audit']];
-  return `<h2>Plus</h2><div class="tiles">${T.map(([v,l,d])=>`<button data-go="${v}">${l}<span>${d}</span></button>`).join('')}</div>`;
+  if(DEMO)T.push(['demoX','Quitter la démo','Revenir à ma vraie société']);else T.push(['demoO','Démonstration','Société fictive remplie d\'exemples pour comprendre chaque rubrique']);
+  return `<h2>Plus</h2><div class="tiles">${T.map(([v,l,d])=>`<button ${v==='demoX'?'data-act="demoExit"':v==='demoO'?'data-act="demoOpen"':`data-go="${v}"`}>${l}<span>${d}</span></button>`).join('')}</div>`;
 }
 const bk=(v,l)=>`<button class="ghost" data-go="${v}" style="margin-bottom:10px">← ${l}</button>`;
 
@@ -2059,6 +2066,167 @@ function lotView(){const l=byId('lots',sub.lid),back='<button class="ghost" data
   <p>Marge : <b class="${s.marge<0?'neg':''}">${money(s.marge)}</b> (ventes ${money(s.ca)} − coûts ${money(s.cost)})</p>
   <h3>Registre</h3>${s.ops.slice().reverse().map(o=>`<div class="card"><div class="top"><span><b>${esc(PIOPS[o.type])}</b> · ${dfr(o.date)}</span><span class="amt">${o.type==='R'?money(o.montant):o.cout?money(o.cout):''}</span></div><div class="small muted">${o.type==='M'?fmtQ(o.qte)+' poissons':o.type==='A'?fmt(o.kg)+' kg':o.type==='P'?fmtQ(o.g)+' g':o.type==='R'?fmtQ(o.qte)+' poissons · '+fmt(o.kg)+' kg':''}${o.lib?' · '+esc(o.lib):''}</div>${isAdmin()||o.cr===ME?`<button class="dg" style="margin-top:6px" data-act="delPiop" data-id="${esc(o.id)}">Supprimer</button>`:''}</div>`).join('')||'<p class="muted">Aucune opération.</p>'}`}
 
+/* ============ DÉMONSTRATION : SOCIÉTÉ FICTIVE REMPLIE D'EXEMPLES ============ */
+const DEMO_PIN='000000',DEMO_PASS='demonstration-mupglobal';
+var SEEDING=false;
+async function demoCreate(){
+  SEEDING=true;
+  try{
+    await setupNew({nom:'MupGlobal SARL — DÉMO',gnom:'Gérant Démo',pin:DEMO_PIN,pin2:DEMO_PIN,pass:DEMO_PASS,pass2:DEMO_PASS,base:'CDF',taux:'2800'});
+    await seedDemo();
+  }finally{SEEDING=false}
+  await saveNow();view='accueil';UI.view='accueil';saveUI();render();toast('Démonstration prête : suivez la visite guidée');
+}
+async function seedDemo(){
+  const Y=+today().slice(0,4),T=today(),p2=n=>String(n).padStart(2,'0');
+  const dt=(m,d)=>{const x=`${Y}-${p2(m)}-${p2(d)}`;return x>T?T:x};
+  const FK=(id,ds={})=>({id,dataset:ds,querySelector:()=>null});
+  const S=(id,F,ds)=>submitForm(FK(id,ds),F);
+  const Q=(k,F)=>S('fq',{cur:'CDF',rate:'2800',tva:'',piece:'',tr:'5212',...F},{k});
+  const nm=(c,n)=>live(D[c]).find(x=>x.nom===n)?.id;
+  const A={ferme:'act0',poulets:'act1',elec:'act2',couture:'act3',peint:'act4',fg:'act5'};
+  const curM=+T.slice(5,7);
+  // 1. Identité et seuils
+  await commitSettings({...D.settings,rccm:'CD/LSH/RCCM/00-B-00000 (fictif)',idnat:'00-000-N00000X (fictif)',nif:'A0000000X (fictif)',tel:'+243 000 000 000',email:'demo@exemple.cd',seuil1:1000000,annexe:'Données entièrement fictives, créées pour la démonstration.'},'réglages démo','');
+  // 2. Tiers
+  for(const [type,n] of [['C','Clinique Espoir'],['C','Hôtel du Lac (fictif)'],['C','Mme Ilunga'],['C','M. Kalala'],['C','Supermarché Jambo (fictif)'],['C','Ferme Lupoto (fictive)'],['F','Agro Intrants Katanga (fictif)'],['F','Solaire Pro Distribution (fictif)'],['F','Tissus Wax Lubumbashi (fictif)'],['F','Peintures du Katanga (fictif)'],['F','Couvoir de Kipushi (fictif)']])
+    await S('ft',{type,nom:n,tel:'',adresse:'Lubumbashi',nif:''});
+  const C=n=>nm('tiers',n);
+  // 3. Financement, immobilisations, frais généraux
+  await Q('apport',{date:dt(1,3),mt:'60000000',lib:'Apport en capital des associés',acc:'101',act:A.fg});
+  await Q('emprunt',{date:dt(2,1),mt:'25000000',lib:'Prêt bancaire d\'équipement (5 ans)',acc:'162',act:A.fg});
+  await Q('transfert',{date:dt(1,5),mt:'12000000',mt2:'12000000',lib:'Approvisionnement de la caisse',tr:'5212',tr2:'5712',act:A.fg});
+  await saveAsset({nom:'Groupe électrogène 20 kVA',compte:'241',date:dt(1,15),cout:'9800000',duree:'5',act:A.elec,pay:'5212',rate:'2800'});
+  await saveAsset({nom:'Motopompe et forage de la ferme',compte:'242',date:dt(2,10),cout:'4200000',duree:'5',act:A.ferme,pay:'5212',rate:'2800'});
+  await saveAsset({nom:'Trois machines à coudre industrielles',compte:'241',date:dt(3,2),cout:'2400000',duree:'5',act:A.couture,pay:'5212',rate:'2800'});
+  for(let m=1;m<=curM;m++){
+    await Q('depense',{date:dt(m,5),mt:'800000',lib:'Loyer du bureau — '+MOISL[m-1],acc:'622',act:A.fg});
+    await Q('depense',{date:dt(m,10),mt:'150000',lib:'Téléphone et internet — '+MOISL[m-1],acc:'628',act:A.fg});
+    await Q('vente',{date:dt(m,18),mt:'1500000',lib:'Dépannages et petites installations — '+MOISL[m-1],acc:'706',act:A.elec,tr:'5712'});
+    if(m>=3)await Q('rembours',{date:dt(m,28),mt:'600000',int:'150000',lib:'Échéance du prêt — '+MOISL[m-1],acc:'162',act:A.fg});
+  }
+  // 4. Stocks : articles et achats initiaux
+  const items=[['Panneau solaire 550 W','pièce','321',A.elec,32,280000],['Batterie lithium 5 kWh','pièce','321',A.elec,6,2100000],['Onduleur hybride 5 kW','pièce','321',A.elec,3,1900000],['Câble solaire 6 mm²','mètre','321',A.elec,450,4500],['Wax hollandais','mètre','321',A.couture,60,15000],['Peinture acrylique blanche','litre','321',A.peint,100,9000]];
+  for(const [n,u,cat,act,q,pu] of items){await S('fi',{nom:n,unite:u,seuil:String(Math.round(q/5)),act,cat});await S('fmv',{item:nm('items',n),q:String(q),pu:String(pu),date:dt(3,1),motif:'',pay:'5212',tiers:'',rate:'2800'},{k:'E'})}
+  const I=n=>nm('items',n);
+  // 5. Ferme maraîchère
+  await S('fparc',{nom:'Parcelle A (gombo)',surface:'0.5',lieu:'Ferme de Kasapa'});await S('fparc',{nom:'Parcelle B (aubergine africaine)',surface:'0.5',lieu:'Ferme de Kasapa'});
+  await S('fcyc',{parcelle:nm('parcels','Parcelle A (gombo)'),culture:'Gombo',variete:'Clemson',semis:dt(6,1),recolte:dt(9,30),surface:'0.5',objectif:'6000',prix:'2500',statut:'En récolte'});
+  await S('fcyc',{parcelle:nm('parcels','Parcelle B (aubergine africaine)'),culture:'Aubergine africaine',variete:'Locale',semis:dt(7,15),recolte:dt(12,15),surface:'0.5',objectif:'8000',prix:'2000',statut:'En culture'});
+  const cy=live(D.cycles),cG=cy.find(c=>c.culture==='Gombo').id,cA=cy.find(c=>c.culture==='Aubergine africaine').id;
+  const fop=(cycle,type,date,F)=>saveFop({cycle,type,date,lib:'',qte:'',unite:'kg',cout:'',jh:'',montant:'',pay:'5712',...F});
+  await fop(cG,'T',dt(6,1),{lib:'Labour et semis',cout:'180000',jh:'12'});await fop(cG,'I',dt(6,1),{lib:'Semences et fumier',cout:'220000'});await fop(cG,'P',dt(7,10),{lib:'Traitement contre les pucerons',cout:'60000'});await fop(cG,'A',dt(7,20),{lib:'Carburant motopompe',cout:'90000'});
+  for(const [m,d,kg] of [[8,5,450],[8,20,620],[9,5,700],[9,20,680],[10,5,560],[10,20,480]]){if(dt(m,d)<T){await fop(cG,'R',dt(m,d),{qte:String(kg),pay:''});await fop(cG,'V',dt(m,d+1),{lib:'Vente au marché Mzee',qte:String(kg),montant:String(kg*2500)})}}
+  await fop(cA,'T',dt(7,15),{lib:'Préparation et repiquage',cout:'200000',jh:'14'});await fop(cA,'I',dt(7,15),{lib:'Plants et engrais NPK',cout:'260000'});await fop(cA,'A',dt(9,1),{lib:'Irrigation (carburant)',cout:'110000'});
+  if(dt(11,2)<T){await fop(cA,'R',dt(11,2),{qte:'350',pay:''});await fop(cA,'V',dt(11,3),{lib:'Vente Supermarché Jambo',qte:'350',montant:'700000'})}
+  // 6. Poulets de chair : une bande terminée, une en cours
+  const band=async(nom,date,nb,statut)=>{await S('fbande',{nom,date,nb:String(nb),pu:'2500',souche:'Cobb 500',batiment:'Poulailler 1',duree:'42',statut,pay:'5712'});return nm('bandes',nom)};
+  const b1=await band('Bande de mars',dt(3,1),500,'En cours');
+  const pop=(type,bande,date,F)=>savePop(type,{bande,date,lib:'',qte:'',kg:'',cout:'',montant:'',pk:'',pay:'',...F});
+  await pop('A',b1,dt(3,1),{kg:'400',cout:'560000',lib:'Aliment démarrage',pay:'5712'});await pop('S',b1,dt(3,8),{cout:'85000',lib:'Vaccins Gumboro et Newcastle',pay:'5712'});
+  await pop('M',b1,dt(3,4),{qte:'6'});await pop('P',b1,dt(3,15),{kg:'0.45'});await pop('A',b1,dt(3,15),{kg:'900',cout:'1170000',lib:'Aliment croissance',pay:'5712'});await pop('M',b1,dt(3,20),{qte:'4'});
+  await pop('P',b1,dt(3,29),{kg:'1.4'});await pop('A',b1,dt(3,29),{kg:'700',cout:'875000',lib:'Aliment finition',pay:'5712'});await pop('P',b1,dt(4,10),{kg:'2.3'});
+  await pop('V',b1,dt(4,12),{qte:'300',kg:'690',montant:'4485000',lib:'Supermarché Jambo',pay:'5712'});await pop('V',b1,dt(4,14),{qte:'190',kg:'440',montant:'2860000',lib:'Marché Mzee',pay:'5712'});
+  if(dt(10,20)<T){const b2=await band('Bande d\'octobre',dt(10,20),600,'En cours');
+    await pop('A',b2,dt(10,20),{kg:'480',cout:'672000',lib:'Aliment démarrage',pay:'5712'});await pop('S',b2,dt(10,27),{cout:'95000',lib:'Vaccins',pay:'5712'});await pop('M',b2,dt(10,23),{qte:'8'});
+    if(dt(11,3)<T){await pop('P',b2,dt(11,3),{kg:'0.5'});await pop('A',b2,dt(11,3),{kg:'1000',cout:'1300000',lib:'Aliment croissance',pay:'5712'});await pop('M',b2,dt(11,10),{qte:'5'})}
+    if(dt(11,17)<T)await pop('P',b2,dt(11,17),{kg:'1.55'})}
+  // 7. Pisciculture
+  await saveLot(FK('flot'),{nom:'Lot Tilapia 2026',bassin:'Étang 1',espece:'Tilapia',date:dt(6,1),nb:'2000',pmi:'5',pu:'150',surface:'600',duree:'180',obj:'400',pay:'5712'});
+  const lot=live(D.lots)[0].id,pio=(type,date,F)=>savePiop(type,{lot,date,lib:'',qte:'',kg:'',g:'',cout:'',montant:'',pk:'',pay:'',...F});
+  for(const [m,kg,c] of [[6,60,90000],[7,120,180000],[8,180,270000],[9,240,360000],[10,280,420000]])await pio('A',dt(m,2),{kg:String(kg),cout:String(c),lib:'Aliment flottant',pay:'5712'});
+  await pio('M',dt(6,10),{qte:'60'});await pio('P',dt(7,1),{g:'45'});await pio('M',dt(7,20),{qte:'25'});await pio('P',dt(8,1),{g:'110'});await pio('P',dt(9,1),{g:'190'});await pio('P',dt(10,1),{g:'270'});await pio('P',dt(11,1),{g:'340'});
+  if(dt(11,15)<T)await pio('R',dt(11,15),{qte:'400',kg:'140',montant:'1260000',lib:'Récolte partielle, vente au marché',pay:'5712'});
+  // 8. Électricité & solaire : chantiers à toutes les étapes
+  const chant=async(F,pt)=>{await saveChantier(FK('fchant',{id:'',pt:pt?'1':''}),{tpl:'on',resp:ME,desc:'',adresse:'Lubumbashi',kwc:'',surf:'',couches:'2',rend:'10',...F});return live(D.projects).find(p=>p.nom===F.nom)};
+  const setAv=async(p,frac)=>{const ts=live(D.tasks).filter(t=>t.projet===p.id).sort((a,b)=>a.debut.localeCompare(b.debut));let i=0;for(const t of ts){const r=(i+1)/ts.length,x=JSON.parse(JSON.stringify(t));x.av=r<=frac?100:r-1/ts.length<frac?50:0;i++;if(x.av)await commit('tasks',x,'avancement',x.nom,{noAudit:true})}};
+  const doc=async(type,client,date,lignes,o={})=>{const d={id:uid(),type,num:type==='D'?nextNum('DV'):'',st:'B',date,ech:addDays(date,30),client,proj:o.proj||'',act:o.act||A.fg,acc:o.acc||'706',tva:false,tvaRate:D.settings.tva,cur:'CDF',rate:2800,lignes,notes:o.notes||''};await commit('docs',d,type==='D'?'devis':'brouillon facture',d.num||'');if(type==='D'&&o.conv){const c=JSON.parse(JSON.stringify(d));c.conv=true;await commit('docs',c,'devis converti',c.num)}if(type!=='D')await issueDoc(d.id);return d.id};
+  const pay=(id,mt,date,tr)=>recordPay(id,{mt:String(mt),tr:tr||'5212',date,rate:'2800'});
+  const chop=(p,type,date,F)=>saveChop(FK('fchop',{k:type,p:p.id}),{date,lib:'',nb:'1',jours:'1',taux:'',cout:'',pay:'5712',...F});
+  const sortie=(p,item,q,date)=>S('fchmat',{item:I(item),q:String(q),date},{p:p.id});
+  {const p=await chant({nom:'Solaire 5 kWc — Hôtel du Lac',client:C('Hôtel du Lac (fictif)'),ctype:'Installation solaire',kwc:'5',debut:dt(4,10),fin:dt(5,5),montant:'16000000',statut:'Clôturé'});
+   await setAv(p,1);await doc('D',p.client,dt(4,2),[{des:'Centrale solaire 5 kWc pour la réception et la cuisine',q:1,pu:16000000}],{proj:p.id,act:A.elec,conv:1});
+   const f=await doc('F',p.client,dt(5,6),[{des:'Centrale solaire 5 kWc — selon devis',q:1,pu:16000000}],{proj:p.id,act:A.elec});await pay(f,16000000,dt(5,20));
+   await sortie(p,'Panneau solaire 550 W',9,dt(4,15));await sortie(p,'Batterie lithium 5 kWh',2,dt(4,15));await sortie(p,'Onduleur hybride 5 kW',1,dt(4,15));await sortie(p,'Câble solaire 6 mm²',100,dt(4,15));
+   await chop(p,'MO',dt(4,30),{lib:'Équipe de pose (3 techniciens)',nb:'3',jours:'8',taux:'25000'});await chop(p,'MAT',dt(4,16),{lib:'Structures et visserie',cout:'900000'})}
+  {const p=await chant({nom:'Solaire 10 kWc — Clinique Espoir',client:C('Clinique Espoir'),ctype:'Installation solaire',kwc:'10',debut:dt(8,25),fin:dt(10,10),montant:'32000000',statut:'Facturé'});
+   await setAv(p,1);await doc('D',p.client,dt(8,20),[{des:'Centrale solaire 10 kWc clé en main (18 panneaux 550 W, 4 batteries 5 kWh, 2 onduleurs 5 kW)',q:1,pu:32000000}],{proj:p.id,act:A.elec,conv:1});
+   const f=await doc('F',p.client,dt(10,12),[{des:'Centrale solaire 10 kWc clé en main — selon devis',q:1,pu:32000000}],{proj:p.id,act:A.elec});await pay(f,20000000,dt(10,20));
+   await sortie(p,'Panneau solaire 550 W',18,dt(9,5));await sortie(p,'Batterie lithium 5 kWh',4,dt(9,5));await sortie(p,'Onduleur hybride 5 kW',2,dt(9,5));await sortie(p,'Câble solaire 6 mm²',180,dt(9,5));
+   await chop(p,'MO',dt(9,20),{lib:'Équipe de pose (4 techniciens)',nb:'4',jours:'12',taux:'25000'});await chop(p,'DEP',dt(9,6),{lib:'Transport du matériel et location échafaudage',cout:'650000'});await chop(p,'MAT',dt(9,8),{lib:'Structures aluminium et visserie',cout:'1800000'})}
+  {const p=await chant({nom:'Électricité villa — M. Kalala',client:C('M. Kalala'),ctype:'Électricité bâtiment',debut:dt(11,3),fin:addDays(T,14),montant:'6500000',statut:'En cours'});
+   await setAv(p,0.45);await doc('D',p.client,dt(10,28),[{des:'Installation électrique complète villa (tableau, 24 points lumineux, 30 prises)',q:1,pu:6500000}],{proj:p.id,act:A.elec,conv:1});
+   const f=await doc('F',p.client,dt(11,3),[{des:'Acompte de 50 % sur installation électrique villa',q:1,pu:3250000}],{proj:p.id,act:A.elec});await pay(f,3250000,dt(11,4));
+   await sortie(p,'Câble solaire 6 mm²',120,dt(11,5));await chop(p,'MO',dt(11,15),{lib:'Électriciens (2)',nb:'2',jours:'6',taux:'22000'});await chop(p,'MAT',dt(11,6),{lib:'Gaines, boîtiers, disjoncteurs, appareillage',cout:'1450000'})}
+  {const p=await chant({nom:'Pompage solaire — Ferme Lupoto',client:C('Ferme Lupoto (fictive)'),ctype:'Pompage solaire',kwc:'3',debut:addDays(T,20),fin:addDays(T,45),montant:'14000000',statut:'Devis envoyé'});
+   await doc('D',p.client,dt(11,10),[{des:'Pompage solaire 3 kWc, pompe immergée et réservoir 10 m³',q:1,pu:14000000}],{proj:p.id,act:A.elec})}
+  await chant({nom:'Maintenance groupe — Supermarché Jambo',client:C('Supermarché Jambo (fictif)'),ctype:'Maintenance, dépannage',debut:addDays(T,7),fin:addDays(T,9),montant:'1200000',statut:'Prospect'});
+  // 9. Peinture
+  {const p=await chant({nom:'Peinture Hôtel du Lac — 2e étage',client:C('Hôtel du Lac (fictif)'),ctype:'Peinture intérieure',surf:'420',couches:'2',rend:'10',debut:dt(11,1),fin:addDays(T,10),montant:'8400000',statut:'En cours'},1);
+   await setAv(p,0.6);await doc('D',p.client,dt(10,25),[{des:'Peinture intérieure 420 m² : préparation, impression et 2 couches',q:420,pu:20000}],{proj:p.id,act:A.peint,conv:1});
+   const f=await doc('F',p.client,dt(11,2),[{des:'Acompte 40 % — peinture 2e étage',q:1,pu:3360000}],{proj:p.id,act:A.peint});await pay(f,3360000,dt(11,3));
+   await sortie(p,'Peinture acrylique blanche',90,dt(11,4));await chop(p,'MO',dt(11,14),{lib:'Peintres (3)',nb:'3',jours:'8',taux:'18000'})}
+  // 10. Couture : commandes à toutes les étapes
+  const cmd=async(F)=>{await saveCmd(FK('fcmd',{id:''}),{cat:'Femme',tissu:'Fourni par l\'atelier',resp:ME,note:'',essai:'',m0:'',m1:'',m2:'',m3:'',m4:'',m5:'',m6:'',m7:'',m8:'',m9:'',...F});return live(D.cmds).find(c=>c.modele===F.modele)};
+  {const c=await cmd({client:C('Mme Ilunga'),modele:'Deux robes longues en wax, col bateau',qte:'2',montant:'250000',date:dt(10,2),essai:dt(10,9),livr:dt(10,16),statut:'Livrée',m0:'92',m1:'74',m2:'102',m3:'38',m4:'58',m6:'140'});
+   const f=await doc('F',c.client,dt(10,2),[{des:c.modele,q:1,pu:250000}],{proj:c.id,act:A.couture,acc:'702'});await pay(f,100000,dt(10,2),'5712');await pay(f,150000,dt(10,16),'5712');
+   await sortie(c,'Wax hollandais',12,dt(10,3));await chop(c,'MO',dt(10,14),{lib:'Couturière',nb:'1',jours:'3',taux:'15000'})}
+  {const c=await cmd({client:C('Hôtel du Lac (fictif)'),cat:'Uniformes, tenues de groupe',modele:'Uniformes du personnel (chemise et pantalon)',qte:'20',montant:'1800000',date:dt(11,5),essai:addDays(T,2),livr:addDays(T,9),statut:'Couture',note:'Tailles S à XL, logo brodé sur la poche'});
+   const f=await doc('F',c.client,dt(11,5),[{des:'Acompte 50 % — 20 uniformes',q:1,pu:900000}],{proj:c.id,act:A.couture,acc:'702'});await pay(f,900000,dt(11,6));
+   await sortie(c,'Wax hollandais',40,dt(11,6));await chop(c,'MO',dt(11,18),{lib:'Deux couturières',nb:'2',jours:'5',taux:'15000'})}
+  await cmd({client:C('Mme Ilunga'),modele:'Ensemble pagne trois pièces',qte:'1',montant:'120000',date:dt(11,12),livr:addDays(T,-1),statut:'Essayage'});
+  await cmd({client:C('M. Kalala'),cat:'Homme',modele:'Costume abacost sur mesure',qte:'1',montant:'180000',date:addDays(T,-2),livr:addDays(T,12),statut:'Reçue',m0:'104',m1:'92',m3:'46',m4:'64',m7:'104',m8:'41'});
+  // 11. Projet interne avec Gantt
+  {await S('fproj',{nom:'Extension du poulailler à 1 000 sujets',act:A.poulets,resp:ME,debut:dt(10,1),fin:addDays(T,40),statut:'En cours',budget:'9500000',client:'',desc:'Construire un 2e bâtiment pour doubler la production.'});
+   const p=live(D.projects).find(x=>x.nom.startsWith('Extension'));let prev='';
+   for(const [n,a,b,av,ms] of [['Plan et devis des matériaux',dt(10,1),dt(10,10),100],['Achat tôles, bois, grillage',dt(10,11),dt(10,25),100],['Fondation et murets',dt(10,26),addDays(T,-6),100],['Charpente et toiture',addDays(T,-5),addDays(T,10),40],['Mangeoires, abreuvoirs, éclairage',addDays(T,11),addDays(T,25),0],['Réception et premier lot',addDays(T,40),addDays(T,40),0,1]]){
+     await saveTask(FK('ftask',{p:p.id,id:''}),{nom:n,resp:ME,dep:prev,debut:a,fin:b,jalon:ms?'on':'',av:String(av),note:''});prev=live(D.tasks).find(t=>t.projet===p.id&&t.nom===n).id}
+   await Q('depense',{date:dt(10,15),mt:'3800000',lib:'Tôles, bois et grillage — extension poulailler',acc:'605',act:A.poulets})}
+  // 12. Paie : trois employés, bulletins de septembre et octobre payés, novembre en brouillon
+  for(const [nom,poste,base,pac,act] of [['Jean Mutombo','Chef de ferme',450000,3,A.ferme],['Mireille Kasongo','Couturière',380000,2,A.couture],['Patrick Ngoy','Électricien',600000,4,A.elec]])await S('fe',{nom,poste,tel:'',base:String(base),cur:'CDF',cnss:'',pac:String(pac),act,actif:'on'});
+  for(const m of [9,10,11]){if(`${Y}-${p2(m)}`>T.slice(0,7))break;
+    for(const e of live(D.emps)){const bi=+e.base,ipr=iprCalc(bi,r2(bi*D.settings.cnssSal/100),'CDF',e.pac);
+      await S('fs',{mois:`${Y}-${p2(m)}`,emp:e.id,base:String(bi),primes:'0',indem:'60000',ipr:String(ipr),iprAuto:'on',avance:'0'});
+      if(m===11)continue;const s=JSON.parse(JSON.stringify(live(D.slips).find(x=>x.emp===e.id&&x.mois===`${Y}-${p2(m)}`)));s.tx={cs:+D.settings.cnssSal,cp:+D.settings.cnssPat,inpp:+D.settings.inpp,onem:+D.settings.onem};s.entryId=await postSlip(s);s.st='V';await commit('slips',s,'validation paie',e.nom);
+      await S('fps',{tr:'5212',date:dt(m+1,3)},{id:s.id})}}
+  // 13. Achats : un circuit complet, une commande en attente de réception, une demande à approuver
+  const po=async(F,lignes)=>{const p={id:uid(),num:poNum('DA'),dem:ME,statut:'Demande',bc:'',apb:'',apd:'',rej:'',cdate:'',rdate:'',rby:'',fnum:'',fdate:'',entryId:'',proj:'',note:'',...F,lignes,total:r2(lignes.reduce((s,l)=>s+l.q*l.pu,0))};await commit('pos',p,'demande d\'achat',p.num);return byId('pos',p.id)};
+  const approve=async p=>{await commit('aprs',{id:uid(),e:p.id,u:ME,h:phash(p),date:today()},'approbation achat',p.num);return poStep(p.id,{statut:'Approuvée',apb:ME,apd:today()},'approbation achat')};
+  {let p=await po({fourn:C('Solaire Pro Distribution (fictif)'),date:dt(11,2),act:A.elec,motif:'Réassort batteries pour les prochains chantiers'},[{item:I('Batterie lithium 5 kWh'),des:'Batterie lithium 5 kWh',q:2,pu:2050000}]);
+   p=await approve(p);p=await poStep(p.id,{statut:'Commandée',bc:poNum('BC'),cdate:dt(11,3)},'bon de commande');
+   for(const l of p.lignes)await commit('moves',{id:uid(),date:dt(11,8),item:l.item,type:'E',q:+l.q,pu:+l.pu,motif:'Réception '+p.bc,po:p.id,entryId:'',st:'V'},'réception achat',l.des);
+   p=await poStep(p.id,{statut:'Reçue',rdate:dt(11,8),rby:ME},'réception achat');await savePoInv(FK('fpoinv',{id:p.id}),{date:dt(11,8),fnum:'SPD-2026-0412',acc:'605'});
+   await Q('payfour',{date:dt(11,12),mt:'2000000',lib:'Paiement partiel Solaire Pro Distribution',tiers:p.fourn,act:A.elec})}
+  {let p=await po({fourn:C('Solaire Pro Distribution (fictif)'),date:dt(11,14),act:A.elec,motif:'Panneaux pour le chantier de pompage solaire'},[{item:I('Panneau solaire 550 W'),des:'Panneau solaire 550 W',q:10,pu:275000}]);
+   p=await approve(p);await poStep(p.id,{statut:'Commandée',bc:poNum('BC'),cdate:dt(11,15)},'bon de commande')}
+  await po({fourn:C('Tissus Wax Lubumbashi (fictif)'),date:addDays(T,-1),act:A.couture,motif:'Wax pour les uniformes et les commandes de fin d\'année'},[{item:I('Wax hollandais'),des:'Wax hollandais',q:150,pu:14500},{item:'',des:'Fils, boutons et fermetures',q:1,pu:180000}]);
+  // 14. Budgets et objectifs de l'année
+  const bud=async(act,pm,cm,from)=>{const F={note:'Budget de démonstration'};for(let i=0;i<12;i++){F['p'+i]=i+1>=from?String(pm):'0';F['c'+i]=i+1>=from?String(cm):'0'}await saveBud(FK('fbud',{a:act}),F)};
+  await bud(A.ferme,1200000,450000,6);await bud(A.poulets,2500000,1800000,3);await bud(A.elec,6000000,3500000,1);await bud(A.couture,450000,200000,3);await bud(A.peint,1500000,800000,6);await bud(A.fg,0,1200000,1);
+  const obj=F=>saveObj(FK('fobj',{id:''}),{unite:'',actuel:'',resp:ME,act:'',...F});
+  await obj({lib:'Chiffre d\'affaires des chantiers solaires : 60 millions',metric:'ca',act:A.elec,cible:'60000000'});
+  await obj({lib:'Résultat de la société : 15 millions',metric:'res',cible:'15000000'});
+  await obj({lib:'Garder la trésorerie au-dessus de 10 millions',metric:'tre',cible:'10000000'});
+  await obj({lib:'Récolter 6 tonnes de gombo',metric:'man',act:A.ferme,cible:'6000',unite:'kg',actuel:String(Math.round(cycleStats(byId('cycles',cG)).kg))});
+  UI.lastAct=A.fg;
+}
+const DEMO_TOUR=[
+  ['accueil','Accueil','Résultat de l\'année, trésorerie, alertes et cartes de chaque activité.'],
+  ['direction','Direction','Tableau de bord interactif (touchez un mois ou une activité), budgets, objectifs et rapport PDF du mois.'],
+  ['activites','Ferme maraîchère','Gombo en récolte : coûts, récoltes, ventes et rendement ; aubergine africaine en culture.','ferme'],
+  ['activites','Poulets de chair','Bande de mars terminée (marge, indice de conversion), bande d\'octobre en cours avec courbe de croissance.','poulets'],
+  ['activites','Pisciculture','Lot de tilapias depuis juin : survie, biomasse, pêches de contrôle, récolte partielle.','pisci'],
+  ['activites','Électricité & solaire','Cinq chantiers à des étapes différentes : prospect, devis envoyé, en cours, facturé, clôturé. Ouvrez « Solaire 10 kWc » pour sa rentabilité.','elec'],
+  ['activites','Couture & peinture','Commandes à l\'atelier (une en retard), mesures, acomptes ; chantier de peinture avec calcul des litres.','couture'],
+  ['projets','Projets','Extension du poulailler : tâches enchaînées sur le Gantt, une tâche en cours, un jalon.'],
+  ['factures','Factures','Devis convertis, factures payées en partie, reste à encaisser.'],
+  ['achats','Achats','Un circuit complet (demande → approbation → bon de commande → réception → facture), une commande à réceptionner, une demande à approuver.'],
+  ['paie','Paie','Trois employés, IPR calculé avec le barème, bulletins payés et bulletins de novembre en brouillon.'],
+  ['etats','États financiers','Bilan, compte de résultat, flux de trésorerie, notes annexes, immobilisations amorties.']];
+function demoTour(){return `<div class="card" style="background:var(--y);color:var(--yi);border:0"><b style="font-size:17px">Visite guidée de la démonstration</b><p class="small" style="margin:4px 0 10px">Toutes les données sont fictives. Touchez une rubrique pour voir son exemple. Vous pouvez tout modifier : la démo n'a aucun effet sur votre vraie société.</p>
+  ${DEMO_TOUR.map(([v,l,d,a])=>`<div data-go="${v}"${a?` data-sub3="${a}"`:''} style="cursor:pointer;padding:8px 0;border-top:1px solid rgba(16,20,24,.2)"><b>${l} →</b><div class="small">${d}</div></div>`).join('')}
+  <div class="btns" style="margin:10px 0 0"><button data-act="demoExit" style="background:var(--yi);color:#fff">Revenir à ma société</button><button class="ghost" data-act="demoReset" style="color:var(--yi);border-color:var(--yi)">Recommencer la démo</button></div></div>`}
+
 /* ============ PROJETS, TÂCHES ET GANTT ============ */
 const PSTAT=['Prévu','En cours','Suspendu','Terminé'];
 function projStats(p){const ts=live(D.tasks).filter(t=>t.projet===p.id),t=today();const av=ts.length?Math.round(ts.reduce((s,x)=>s+(+x.av||0),0)/ts.length):(p.statut==='Terminé'?100:0);return {ts,av,late:ts.filter(x=>x.fin<t&&(+x.av||0)<100).length}}
@@ -2236,7 +2404,7 @@ async function saveRec(){
 }
 
 /* ============ SYNCHRONISATION SERVEUR (chiffrée de bout en bout) ============ */
-const SRV=()=>D?.settings?.syncUrl&&D.settings.syncKey&&RX.srv.test(D.settings.syncUrl)?{url:D.settings.syncUrl,key:D.settings.syncKey}:null;
+const SRV=()=>!DEMO&&D?.settings?.syncUrl&&D.settings.syncKey&&RX.srv.test(D.settings.syncUrl)?{url:D.settings.syncUrl,key:D.settings.syncKey}:null;
 const SYNC={err:'',busy:false};let pushT=null;
 function schedulePush(){if(!SRV())return;clearTimeout(pushT);pushT=setTimeout(()=>push().catch(e=>{SYNC.err=e.message}),15000)}
 async function srvFetch(path,opt={}){const s=SRV();if(!s)throw new Error('Serveur non configuré');if(!LOC.tok)LOC.tok=b64e(rnd(24));
@@ -2334,6 +2502,9 @@ document.addEventListener('click',ev=>{
     bande:()=>bandeForm(id),openBande:()=>bandeView(id),pop:()=>popForm(k||'',b.dataset.c||''),
     delPop:async()=>{if(!ask('Supprimer cette opération ? Son écriture comptable éventuelle n\'est pas supprimée.'))return;const o=JSON.parse(JSON.stringify(byId('pouops',id)));o.del=true;await commit('pouops',o,'suppression opération élevage','');render();bandeView(o.bande)},
     chantier:()=>{if(k)sub.chm=k;chantierForm(id)},
+    demoStart:()=>{b.disabled=true;b.textContent='Création en cours… (ne fermez pas l\'application)';return demoCreate()},
+    demoOpen:()=>{location.href='./?demo=1'},demoExit:()=>{location.href='./'},
+    demoReset:()=>{if(!ask('Effacer la démonstration et la recréer ?'))return;localStorage.removeItem(SKEY);localStorage.removeItem(UIKEY);location.reload()},
     poForm:()=>poForm(id),openPo:()=>poView(id),poLine:()=>$('#pol').insertAdjacentHTML('beforeend',poRow()),
     poApprove:async()=>{{const x=byId('pos',id);await commit('aprs',{id:uid(),e:id,u:ME,h:phash(x),date:today()},'approbation achat',x.num)}const p=await poStep(id,{statut:'Approuvée',apb:ME,apd:today()},'approbation achat');poView(p.id);render();toast('Demande approuvée')},
     poReject:async()=>{const m=(window.prompt('Motif du rejet')||'').trim();if(!m)return;await poStep(id,{statut:'Rejetée',apb:ME,apd:today(),rej:m.slice(0,160)},'rejet achat');closeSheet();render();toast('Demande rejetée')},
@@ -2426,7 +2597,9 @@ async function saveManual(f,F,st){
 }
 document.addEventListener('submit',ev=>{
   ev.preventDefault();const f=ev.target,F=Object.fromEntries(new FormData(f));
-  run(async()=>{switch(f.id){
+  run(()=>submitForm(f,F));
+});
+async function submitForm(f,F){switch(f.id){
     case 'fsetup':await setupNew(F);break;
     case 'flogin':{const btn=f.querySelector('button');btn.disabled=true;btn.textContent='Vérification…';try{await unlock(F.u,F.pin);render()}finally{if(btn.isConnected){btn.disabled=false;btn.textContent='Déverrouiller'}}break}
     case 'fjoin':await joinFinish(F);break;
@@ -2486,8 +2659,7 @@ document.addEventListener('submit',ev=>{
     case 'frole':{const id=f.dataset.id;const r=id?JSON.parse(JSON.stringify(byId('roles',id))):{id:'r_'+uid()};r.nom=F.nom.trim().slice(0,40);if(ROLES.includes(r.nom))throw new Error('Nom réservé');r.perms={};for(const [p] of PERMS)if(F['p_'+p])r.perms[p]=true;await commit('roles',r,id?'modification rôle':'nouveau rôle',r.nom);closeSheet();render();toast('Rôle enregistré');break}
     case 'fclose':{const m=F.m;if(!ask('Clôturer définitivement jusqu\'au '+dfr(lastDay(m))+' ? Cette action est irréversible.'))return;await closePeriod(m);render();toast('Période clôturée');break}
     case 'fset':{const s=JSON.parse(JSON.stringify(D.settings));for(const k of ['nom','adresse','rccm','idnat','nif','tel','email','mentions','annexe'])s[k]=(F[k]||'').slice(0,500);for(const k of ['taux','tva','cnssSal','cnssPat','inpp','onem','iprFam','iprFamMax','seuil1','seuil2'])s[k]=Math.max(0,+F[k]||0);if(s.seuil2>0&&validators().length<2)throw new Error('La double validation exige au moins deux utilisateurs ayant le droit de valider. Ajoutez d\'abord un comptable.');if(!(s.taux>0))throw new Error('Taux invalide');s.tvaDefaut=!!F.tvaDefaut;await commitSettings(s,'réglages','');render();toast('Réglages enregistrés');break}
-  }});
-});
+  }}
 function exportCSV(){
   const t=sub.etat,num=n=>String(r2(n)).replace('.',',');let rows=[];
   if(t==='balance'){rows.push(['Compte','Intitulé','Débit','Crédit','Solde']);for(const [c,b] of balRows())rows.push([c,accLib(c),num(b.d),num(b.k),num(b.d-b.k)])}
