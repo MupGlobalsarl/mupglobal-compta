@@ -242,7 +242,7 @@ const TR=c=>TRESO.find(t=>t[0]===c);
 const isTreso=c=>!!TR(c);
 const JR={CA:'Caisse',BQ:'Banque',MM:'Mobile money',AC:'Achats',VE:'Ventes',PA:'Paie',OD:'Opérations diverses',AN:'À-nouveaux'};
 const STK={'311':{l:'Marchandises',ach:'601',v:'6031'},'321':{l:'Matières premières',ach:'602',v:'6032'},'331':{l:'Fournitures consommables',ach:'604',v:'6033'},'361':{l:'Produits finis',ach:null,v:'736'}};
-const COLL=['users','roles','accounts','acts','tiers','items','emps','docs','aprs','entries','pays','slips','moves','assets','recs','projects','tasks','parcels','cycles','farmops','bandes','pouops','chops','cmds','budgets','objs','pos','lots','pisops','log'];
+const COLL=['users','roles','accounts','acts','tiers','items','emps','docs','aprs','entries','pays','slips','moves','assets','recs','projects','tasks','parcels','cycles','farmops','bandes','pouops','chops','cmds','budgets','objs','pos','lots','pisops','stcs','stops','rels','prevs','deps','invs','equips','gammes','mops','conges','pres','prets','log'];
 const ROLES=['Gérant','Comptable','Saisie'];
 
 /* ============ ÉTAT ============ */
@@ -256,7 +256,7 @@ const live=a=>a.filter(x=>!x.del);
 const byId=(c,id)=>id?D[c].find(x=>x.id===id):undefined;
 const meU=()=>byId('users',ME);
 const role=()=>meU()?.role||'Saisie';
-const PERMS=[['valider','Valider les écritures, émettre factures et avoirs, encaisser, contrepasser'],['etats','Voir le tableau de bord et les états financiers'],['paie','Gérer les employés et la paie'],['stocks','Gérer les stocks (articles et mouvements)'],['immo','Immobilisations et rapprochement bancaire'],['tiers','Créer et modifier clients et fournisseurs'],['projets','Créer et piloter les projets et les tâches'],['ferme','Ferme maraîchère : parcelles, campagnes, opérations'],['poulets','Poulets de chair : bandes et registre d\'élevage'],['chantiers','Électricité et solaire : chantiers, matériel, main-d\'œuvre'],['atelier','Couture et peinture : commandes, mesures, chantiers de peinture'],['achats','Achats : demandes, bons de commande, réceptions'],['pisci','Pisciculture : lots, aliment, pêches, récoltes']];
+const PERMS=[['valider','Valider les écritures, émettre factures et avoirs, encaisser, contrepasser'],['etats','Voir le tableau de bord et les états financiers'],['paie','Gérer les employés et la paie'],['stocks','Gérer les stocks (articles et mouvements)'],['immo','Immobilisations et rapprochement bancaire'],['tiers','Créer et modifier clients et fournisseurs'],['projets','Créer et piloter les projets et les tâches'],['ferme','Ferme maraîchère : parcelles, campagnes, opérations'],['poulets','Poulets de chair : bandes et registre d\'élevage'],['chantiers','Électricité et solaire : chantiers, matériel, main-d\'œuvre'],['atelier','Couture et peinture : commandes, mesures, chantiers de peinture'],['achats','Achats : demandes, bons de commande, réceptions'],['pisci','Pisciculture : lots, aliment, pêches, récoltes'],['materiel','Matériel : équipements, entretiens, carburant']];
 const BUILTIN={'Gérant':null,'Comptable':null,'Saisie':['stocks','tiers','ferme','poulets']};
 function perm(p,u){u=u||meU();if(!u)return false;const r=u.role;if(r==='Gérant'||r==='Comptable')return true;if(r==='Saisie')return BUILTIN.Saisie.includes(p);const ro=D.roles&&D.roles.find(x=>x.id===r&&!x.del);return !!(ro&&ro.perms&&ro.perms[p])}
 const roleName=r=>BUILTIN[r]!==undefined?r:((D.roles||[]).find(x=>x.id===r)||{}).nom||'Rôle supprimé';
@@ -376,6 +376,15 @@ function canWrite(u,c,r,old){
       if(b==='Reçue'&&!(perm('achats',u)||perm('stocks',u)||adm))return 'réception non autorisée';
       if(b==='Facturée'&&!adm)return 'facture fournisseur réservée au gérant ou au comptable';
       break}
+    case 'stcs':case 'stops':if(!(perm('chantiers',u)||perm('atelier',u)||adm))return 'droit « chantiers » requis';if(c==='stops'&&r.type==='PAY'&&!adm)return 'paiement réservé au gérant ou au comptable';if(old&&!adm&&!own)return 'modification réservée à son auteur';break;
+    case 'rels':if(!(perm('tiers',u)||adm))return 'droit « tiers » requis';break;
+    case 'prevs':if(!adm)return 'prévisions réservées au gérant ou au comptable';break;
+    case 'deps':if(!perm('stocks',u))return 'droit « stocks » requis';break;
+    case 'invs':if(!perm('stocks',u))return 'droit « stocks » requis';if(old&&old.statut==='Validé')return 'inventaire déjà validé';if(r.statut==='Validé'&&!adm)return 'validation réservée au gérant ou au comptable';break;
+    case 'equips':case 'gammes':case 'mops':if(!(perm('materiel',u)||adm))return 'droit « matériel » requis';break;
+    case 'conges':if(!(perm('paie',u)||adm))return 'droit « paie » requis';if(r.statut!=='Demandé'&&!adm)return 'décision réservée au gérant ou au comptable';break;
+    case 'pres':if(!(perm('paie',u)||adm))return 'droit « paie » requis';break;
+    case 'prets':if(!adm)return 'prêts réservés au gérant ou au comptable';break;
     case 'lots':if(!perm('pisci',u))return 'droit « pisciculture » requis';break;
     case 'pisops':if(!perm('pisci',u))return 'droit « pisciculture » requis';if(old&&!adm&&!own)return 'modification réservée à son auteur';break;
     case 'budgets':if(!perm('valider',u))return 'budget réservé au gérant ou au comptable';break;
@@ -474,7 +483,8 @@ function validRec(c,r){
   if(c==='objs'&&!Number.isInteger(r.y))return false;
   if(c==='aprs'&&!(RX.id.test(r.e||'')&&typeof r.h==='string'))return false;
   if(c==='pos'&&!(RX.date.test(r.date||'')&&Array.isArray(r.lignes)))return false;
-  if((c==='lots'||c==='pisops')&&!RX.date.test(r.date||''))return false;
+  if(['lots','pisops','stops','rels','pres','prets','mops','invs'].includes(c)&&!RX.date.test(r.date||''))return false;
+  if(c==='conges'&&!(RX.date.test(r.du||'')&&RX.date.test(r.au||'')))return false;
   if(c==='recs'&&!Array.isArray(r.points))return false;
   if(c==='accounts'&&!RX.code.test(r.code||''))return false;
   if(c==='entries'&&!r.del&&!balancedLines(r.lines))return false;
@@ -589,11 +599,11 @@ function render(){
   if(SEEDING)return;document.body.classList.toggle('demo',DEMO);
   if(!D){document.body.classList.add('locked');$('#app').innerHTML=HDR?lockScreen():setupScreen();return}
   document.body.classList.remove('locked');
-  const NV={stocks:'plus',paie:'plus',etats:'plus',reglages:'plus',projet:'projets',commande:'activites',direction:'plus',achats:'plus',lot:'activites'}[view]||view;
+  const NV={stocks:'plus',paie:'plus',etats:'plus',reglages:'plus',projet:'projets',commande:'activites',direction:'plus',achats:'plus',materiel:'plus',lot:'activites'}[view]||view;
   $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.go===NV));
   $('#who').textContent=(meU()?.nom||'?').split(' ')[0]+' · '+roleName(role());
   $('#sttl').textContent=D.settings.nom+' · '+EX()+' · tenue en '+BASE();
-  const V={accueil,saisir,factures,stocks,paie,etats,reglages,activites,projets,projet:projetView,commande:cmdView,direction,achats,lot:lotView,plus:plusView};
+  const V={accueil,saisir,factures,stocks,paie,etats,reglages,activites,projets,projet:projetView,commande:cmdView,direction,achats,materiel,lot:lotView,plus:plusView};
   $('#app').innerHTML=(V[view]||accueil)();
 }
 function openSheet(h){$('#sheet').innerHTML=h;$('#ov').classList.add('on');setTimeout(()=>{const f=$('#sheet input:not([type=hidden]),#sheet select');f&&f.focus()},50)}
@@ -778,10 +788,10 @@ async function joinFinish(F){
 }
 
 /* ============ ACCUEIL ============ */
-const docTot=d=>{const ht=r2((d.lignes||[]).reduce((s,l)=>s+r2((+l.q||0)*(+l.pu||0)),0));const tva=d.tva?r2(ht*(+d.tvaRate||D.settings.tva)/100):0;return {ht,tva,ttc:r2(ht+tva)}};
+const docTot=d=>{const ht=r2((d.lignes||[]).reduce((s,l)=>s+r2((+l.q||0)*(+l.pu||0)),0));const tva=d.tva?r2(ht*(+d.tvaRate||D.settings.tva)/100):0,ttc=r2(ht+tva);return {ht,tva,ttc,net:d.sit?r2(ttc-(+d.sit.rg||0)-(+d.sit.remb||0)):ttc}};
 const docAvoirs=d=>r2(live(D.docs).filter(a=>a.type==='A'&&a.of===d.id&&a.st==='E').reduce((s,a)=>s+docTot(a).ttc,0));
 const docPaid=d=>r2(live(D.pays).filter(p=>p.doc===d.id&&p.st==='V').reduce((s,p)=>s+(+p.mt||0),0));
-const docDue=d=>r2(docTot(d).ttc-docAvoirs(d)-docPaid(d));
+const docDue=d=>r2(docTot(d).net-docAvoirs(d)-docPaid(d));
 function docStatus(d){
   if(d.type==='D')return d.conv?['g','Convertie']:d.ech&&d.ech<today()?['','Expiré']:['','Devis'];
   if(d.type==='A')return['','Avoir'];
@@ -803,6 +813,12 @@ function alertes(){
   for(const b of live(D.bandes).filter(b=>b.statut!=='Clôturée')){const s=bandeStats(b);if(s.lastM&&s.init&&s.lastM[1]/s.init>0.01&&s.lastM[0]>=addDays(t,-2))a.push(['r',`${esc(b.nom)} : mortalité de ${fmtQ(s.lastM[1])} sujets le ${dfr(s.lastM[0])} (plus de 1 %)`,'activites']);if(s.age>(+b.duree||42)+7)a.push(['o',`${esc(b.nom)} a ${s.age} jours : au-delà de la durée prévue`,'activites'])}
   {const myLate=live(D.tasks).filter(x=>x.resp===ME&&(+x.av||0)<100&&x.fin<t);if(myLate.length)a.push(['r',`${myLate.length} tâche(s) qui vous sont attribuées sont en retard`,'projets'])}
   if(isAdmin()){const w=live(D.entries).filter(e=>e.st==='B'&&needs2(e)&&!approvers(e).includes(ME));if(w.length)a.push(['r',`${w.length} paiement(s) au-delà du seuil attendent votre validation`,'saisir'])}
+  {const pr=live(D.rels).filter(r=>r.res==='Promesse de paiement'&&r.dprom&&r.dprom<t&&docDue(byId('docs',r.doc)||{lignes:[]})>0.005&&!live(D.rels).some(x=>x.doc===r.doc&&x.date>r.date));if(pr.length)a.push(['r',`${pr.length} promesse(s) de paiement non tenue(s)`,'factures'])}
+  for(const tc of live(D.tiers).filter(x=>x.type==='C'&&+x.plafond>0)){const e=clientEncours(tc.id);if(e>+tc.plafond)a.push(['o',`${esc(tc.nom)} dépasse son plafond de crédit : ${money(e)} pour ${money(tc.plafond)}`,'factures'])}
+  {let n=0;for(const e of live(D.equips))for(const g of live(D.gammes).filter(g=>g.eq===e.id))if(gStat(g,e).late)n++;if(n)a.push(['o',`${n} entretien(s) de matériel en retard`,'materiel'])}
+  if(isAdmin()&&live(D.prevs).length+live(D.docs).length>0&&+D.settings.seuilTreso>0){const low=prevData().rows.find(r=>r.sol<+D.settings.seuilTreso);if(low)a.push(['o',`Trésorerie prévue sous le seuil fin ${MOISL[+low.m.slice(5)-1]} (${money(low.sol)})`,'direction'])}
+  if(isAdmin()){const w=live(D.conges).filter(c=>c.statut==='Demandé');if(w.length)a.push(['o',`${w.length} demande(s) de congé à décider`,'paie'])}
+  {const w=live(D.invs).filter(v=>v.statut==='Ouvert'&&v.date<addDays(t,-7));if(w.length)a.push(['o',`${w.length} inventaire(s) ouvert(s) depuis plus de 7 jours`,'stocks'])}
   {const w=live(D.pos).filter(canApprove);if(w.length)a.push(['o',`${w.length} demande(s) d'achat à approuver (${money(w.reduce((s,p)=>s+(+p.total||0),0))})`,'achats'])}
   {const w=live(D.pos).filter(p=>p.statut==='Commandée'&&p.cdate<addDays(t,-14));if(w.length)a.push(['o',`${w.length} commande(s) fournisseur non reçue(s) depuis plus de 14 jours`,'achats'])}
   for(const l of live(D.lots).filter(l=>l.statut!=='Clôturé')){const s=lotStats(l);if(s.lastM&&s.init&&s.lastM[1]/s.init>0.02&&s.lastM[0]>=addDays(t,-2))a.push(['r',`${esc(l.nom)} : mortalité de ${fmtQ(s.lastM[1])} poissons le ${dfr(s.lastM[0])} (plus de 2 %)`,'activites']);if(s.age>(+l.duree||180)+15)a.push(['o',`${esc(l.nom)} : durée d'élevage dépassée (${s.age} jours)`,'activites'])}
@@ -938,8 +954,8 @@ function factures(){
   const ds=live(D.docs).filter(d=>f==='F'?(d.type==='F'||d.type==='A'):d.type===f).filter(d=>!q||((d.num||'')+' '+tiersNom(d.client)).toLowerCase().includes(q)).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.num||'').localeCompare(a.num||''));
   const enc=r2(live(D.docs).filter(d=>d.type==='F'&&d.st==='E').reduce((s,d)=>s+toBase(Math.max(0,docDue(d)),d.cur,d.rate),0));
   return `<h2>Factures et devis</h2>
-  <div class="seg"><button class="${f==='F'?'on':''}" data-act="sub" data-k="fact" data-v="F">Factures et avoirs</button><button class="${f==='D'?'on':''}" data-act="sub" data-k="fact" data-v="D">Devis</button><button class="${f==='T'?'on':''}" data-act="sub" data-k="fact" data-v="T">Clients et fournisseurs</button></div>
-  ${f==='T'?tiersView():`<div class="btns"><button class="pr" data-act="doc" data-k="${f}">+ ${f==='F'?'Nouvelle facture':'Nouveau devis'}</button></div>
+  <div class="seg"><button class="${f==='F'?'on':''}" data-act="sub" data-k="fact" data-v="F">Factures et avoirs</button><button class="${f==='D'?'on':''}" data-act="sub" data-k="fact" data-v="D">Devis</button><button class="${f==='R'?'on':''}" data-act="sub" data-k="fact" data-v="R">Créances et relances</button><button class="${f==='T'?'on':''}" data-act="sub" data-k="fact" data-v="T">Clients et fournisseurs</button></div>
+  ${f==='R'?creances():f==='T'?tiersView():`<div class="btns"><button class="pr" data-act="doc" data-k="${f}">+ ${f==='F'?'Nouvelle facture':'Nouveau devis'}</button></div>
   ${f==='F'?`<p class="muted">Reste à encaisser sur les factures émises : <b>${money(enc)}</b></p>`:''}
   <input type="search" id="fq2" placeholder="Rechercher un numéro ou un client" value="${esc(sub.q||'')}" style="width:100%;margin-bottom:12px">
   ${ds.length?`<table class="stack"><thead><tr><th>N°</th><th>Client</th><th>Date</th><th class="n">Montant</th><th>Statut</th><th></th></tr></thead><tbody>${ds.map(d=>{const s=docStatus(d),t=docTot(d);return `<tr><td><b>${esc(d.num||'(brouillon)')}</b></td><td>${esc(tiersNom(d.client))}</td><td>${dfr(d.date)}</td><td class="n">${d.type==='A'?'−':''}${money(t.ttc,d.cur)}${d.type==='F'&&d.st==='E'&&s[1]==='Partielle'?`<br><span class="small muted">reste ${money(docDue(d),d.cur)}</span>`:''}</td><td><span class="tag ${s[0]}">${s[1]}</span></td><td><button class="ghost" data-act="openDoc" data-id="${esc(d.id)}">Ouvrir</button></td></tr>`}).join('')}</tbody></table>`:`<p class="empty">Rien pour l'instant.</p>`}`}`;
@@ -951,12 +967,13 @@ function tiersView(){
   ${ts.length?`<table class="stack"><thead><tr><th>Nom</th><th>Type</th><th>Téléphone</th><th class="n">Solde</th><th></th></tr></thead><tbody>${ts.map(t=>{const b=t.type==='F'?-(bal[t.id]||0):(bal[t.id]||0);return `<tr><td><b>${esc(t.nom)}</b></td><td>${t.type==='C'?'Client':t.type==='F'?'Fournisseur':'Autre'}</td><td>${esc(t.tel)}</td><td class="n">${money(b)}<br><span class="small muted">${t.type==='F'?'nous devons':'il nous doit'}</span></td><td><button class="ghost" data-act="tiers" data-id="${esc(t.id)}">Modifier</button></td></tr>`}).join('')}</tbody></table>`:'<p class="empty">Aucun client ni fournisseur.</p>'}`;
 }
 function tiersForm(id){
-  const t=id?byId('tiers',id):{id:'',type:'C',nom:'',tel:'',adresse:'',nif:''};
+  const t=id?byId('tiers',id):{id:'',type:'C',nom:'',tel:'',adresse:'',nif:'',plafond:''};
   openSheet(`<h2>${id?'Modifier':'Nouveau'} tiers</h2><form id="ft" data-id="${esc(t.id)}">
   <label class="f">Type<select name="type"><option value="C" ${t.type==='C'?'selected':''}>Client</option><option value="F" ${t.type==='F'?'selected':''}>Fournisseur</option><option value="A" ${t.type==='A'?'selected':''}>Autre</option></select></label>
   <label class="f">Nom<input name="nom" value="${esc(t.nom)}" required maxlength="120"></label>
   <div class="row2"><label class="f">Téléphone<input name="tel" value="${esc(t.tel)}" inputmode="tel" maxlength="40"></label><label class="f">NIF<input name="nif" value="${esc(t.nif)}" maxlength="40"></label></div>
   <label class="f">Adresse<input name="adresse" value="${esc(t.adresse)}" maxlength="200"></label>
+  <label class="f">Plafond de crédit, pour un client (${BASE()}, vide = aucun)<input type="number" name="plafond" step="1" min="0" value="${esc(t.plafond||'')}"></label>
   <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`);
 }
 let docDraft=null;
@@ -985,7 +1002,9 @@ function dLines(){return $$('#dl tr').map(tr=>({des:tr.querySelector('[name=des]
 function dCalc(){if(!$('#dtot'))return;const tv=$('#fd [name=tva]');const t=docTot({lignes:dLines(),tva:tv?tv.checked:docDraft.tva,tvaRate:docDraft.tvaRate});const c=$('#fd [name=cur]')?.value||docDraft.cur;$('#dtot').textContent=`HT ${money(t.ht,c)} · TVA ${money(t.tva,c)} · TTC ${money(t.ttc,c)}`}
 async function postDocEntry(d){
   const t=docTot(d),A=d.type==='A',b=x=>toBase(x,d.cur,d.rate);const ttcB=b(t.ttc),htB=b(t.ht),tvaB=r2(ttcB-htB);
-  const lines=[{c:'411',d:A?0:ttcB,k:A?ttcB:0,t:d.client},{c:d.acc||'706',d:A?htB:0,k:A?0:htB,t:''}];if(tvaB)lines.push({c:'4431',d:A?tvaB:0,k:A?0:tvaB,t:''});
+  let lines=[{c:'411',d:A?0:ttcB,k:A?ttcB:0,t:d.client},{c:d.acc||'706',d:A?htB:0,k:A?0:htB,t:''}];if(tvaB)lines.push({c:'4431',d:A?tvaB:0,k:A?0:tvaB,t:''});
+  if(!A&&d.rgRel){await ensureAccs();lines=[{c:'411',d:ttcB,k:0,t:d.client},{c:'4117',d:0,k:ttcB,t:d.client}]}
+  else if(!A&&d.sit){await ensureAccs();const rg=b(+d.sit.rg||0),rb=b(+d.sit.remb||0);lines[0].d=r2(ttcB-rg-rb);if(rg)lines.push({c:'4117',d:rg,k:0,t:d.client});if(rb)lines.push({c:'4191',d:rb,k:0,t:d.client})}
   const e={id:uid(),date:d.date,jr:'VE',piece:d.num,lib:(A?'Avoir ':'Facture ')+d.num+' — '+tiersNom(d.client),act:d.act,src:{type:A?'avoir':'facture',ref:d.id},st:'V',lines};
   await commit('entries',e,'comptabilisation',e.lib);return e.id;
 }
@@ -994,6 +1013,7 @@ async function issueDoc(id){
   if(locked(d.date))throw new Error('La date tombe dans une période clôturée');
   d.num=nextNum(d.type==='A'?'AV':'FA');if(d.type!=='A')d.tvaRate=d.tva?+D.settings.tva:0;
   d.entryId=await postDocEntry(d);d.st='E';await commit('docs',d,'émission',d.num);
+  {const tc=byId('tiers',d.client),pl=+(tc&&tc.plafond)||0;if(d.type==='F'&&pl&&clientEncours(d.client)>pl)setTimeout(()=>toast('Attention : '+tc.nom+' dépasse son plafond de crédit ('+money(pl)+')'),1500)}
 }
 function docView(id){
   const d=byId('docs',id),t=docTot(d),s=docStatus(d),F=d.type==='F',E=d.st==='E';
@@ -1001,7 +1021,7 @@ function docView(id){
   openSheet(`<h2>${d.type==='F'?'Facture':d.type==='A'?'Avoir':'Devis'} ${esc(d.num||'(brouillon)')} <span class="tag ${s[0]}">${s[1]}</span></h2>
   <p><b>${esc(tiersNom(d.client))}</b><br><span class="muted small">${dfr(d.date)}${d.ech?' · échéance '+dfr(d.ech):''} · ${esc(actNom(d.act))} · ${esc(d.cur)}${d.cur!==BASE()?' au taux '+fmt(d.rate):''}</span></p>
   <table><thead><tr><th>Désignation</th><th class="n">Qté</th><th class="n">P.U.</th><th class="n">Total</th></tr></thead><tbody>${d.lignes.map(l=>`<tr><td>${esc(l.des)}</td><td class="n">${fmtQ(l.q)}</td><td class="n">${fmt(l.pu)}</td><td class="n">${fmt(l.q*l.pu)}</td></tr>`).join('')}
-  <tr><td colspan="3">Total HT</td><td class="n">${money(t.ht,d.cur)}</td></tr>${t.tva?`<tr><td colspan="3">TVA ${esc(d.tvaRate)} %</td><td class="n">${money(t.tva,d.cur)}</td></tr>`:''}<tr class="tot"><td colspan="3">Total TTC</td><td class="n">${money(t.ttc,d.cur)}</td></tr></tbody></table>
+  <tr><td colspan="3">Total HT</td><td class="n">${money(t.ht,d.cur)}</td></tr>${t.tva?`<tr><td colspan="3">TVA ${esc(d.tvaRate)} %</td><td class="n">${money(t.tva,d.cur)}</td></tr>`:''}<tr class="tot"><td colspan="3">Total TTC</td><td class="n">${money(t.ttc,d.cur)}</td></tr>${d.sit?`<tr><td colspan="3">Retenue de garantie ${esc(d.sit.rgPct)} %</td><td class="n">− ${money(d.sit.rg,d.cur)}</td></tr>${+d.sit.remb?`<tr><td colspan="3">Remboursement de l'avance de démarrage</td><td class="n">− ${money(d.sit.remb,d.cur)}</td></tr>`:''}<tr class="tot"><td colspan="3">Net à payer</td><td class="n">${money(t.net,d.cur)}</td></tr>`:''}</tbody></table>
   ${F&&E?`<h3>Encaissements et avoirs</h3>${pays.map(p=>`<div class="card"><div class="top"><span>${dfr(p.date)} · ${esc(TR(p.tr)?.[1]||'')}${p.st==='X'?' <span class="tag r">Annulé</span>':''}</span><span class="amt">${money(p.mt,p.cur)}</span></div>${p.st==='V'&&isAdmin()&&!locked(today())?`<button class="dg" style="margin-top:6px" data-act="cancelPay" data-id="${esc(p.id)}">Annuler (contrepassation)</button>`:''}</div>`).join('')}
   ${avs.map(a=>`<div class="card"><div class="top"><span>Avoir ${esc(a.num||'(brouillon)')}</span><span class="amt">−${money(docTot(a).ttc,a.cur)}</span></div></div>`).join('')}${!pays.length&&!avs.length?'<p class="muted">Aucun encaissement.</p>':''}
   <p>Reste à payer : <b>${money(docDue(d),d.cur)}</b></p>`:''}
@@ -1040,8 +1060,8 @@ function docHTML(d){
   <div style="text-align:right"><h1>${title}</h1><div>N° <b>${esc(d.num||'—')}</b></div><div>Date : ${dfr(d.date)}</div>${d.ech?`<div>${d.type==='F'?'Échéance':'Valable jusqu\'au'} : ${dfr(d.ech)}</div>`:''}${A?`<div>Sur facture ${esc(byId('docs',d.of)?.num)}</div>`:''}</div></div>
   <div class="meta"><div>${[S.rccm&&'RCCM : '+S.rccm,S.idnat&&'Id. Nat. : '+S.idnat,S.nif&&'NIF : '+S.nif].filter(Boolean).map(esc).join('<br>')}</div><div class="box"><b>Client</b><br>${esc(c.nom||'')}<br>${esc(c.adresse||'')}${c.tel?'<br>Tél. '+esc(c.tel):''}${c.nif?'<br>NIF : '+esc(c.nif):''}</div></div>
   <table><thead><tr><th>Désignation</th><th class="n">Qté</th><th class="n">Prix unitaire</th><th class="n">Montant</th></tr></thead><tbody>${d.lignes.map(l=>`<tr><td>${esc(l.des)}</td><td class="n">${fmtQ(l.q)}</td><td class="n">${fmt(l.pu)}</td><td class="n">${fmt(l.q*l.pu)}</td></tr>`).join('')}</tbody></table>
-  <table class="tt" style="width:auto;margin-left:auto;margin-top:8px"><tr><td>Total HT</td><td class="n">${money(t.ht,d.cur)}</td></tr>${t.tva?`<tr><td>TVA ${esc(d.tvaRate)} %</td><td class="n">${money(t.tva,d.cur)}</td></tr>`:''}<tr><td><b>Total TTC</b></td><td class="n"><b>${money(t.ttc,d.cur)}</b></td></tr>${d.type==='F'&&d.st==='E'&&(docPaid(d)||docAvoirs(d))?`<tr><td>Avoirs et paiements reçus</td><td class="n">${money(docAvoirs(d)+docPaid(d),d.cur)}</td></tr><tr><td><b>Reste à payer</b></td><td class="n"><b>${money(docDue(d),d.cur)}</b></td></tr>`:''}${d.cur!==BASE()?`<tr><td class="small">Contre-valeur au taux ${fmt(d.rate)}</td><td class="n small">${money(toBase(t.ttc,d.cur,d.rate))}</td></tr>`:''}</table>
-  <p>Arrêté${d.type==='D'?' le présent devis':'e la présente facture'} à la somme de : <b>${esc(montantLettres(t.ttc,d.cur))}</b>.</p>
+  <table class="tt" style="width:auto;margin-left:auto;margin-top:8px"><tr><td>Total HT</td><td class="n">${money(t.ht,d.cur)}</td></tr>${t.tva?`<tr><td>TVA ${esc(d.tvaRate)} %</td><td class="n">${money(t.tva,d.cur)}</td></tr>`:''}<tr><td><b>Total TTC</b></td><td class="n"><b>${money(t.ttc,d.cur)}</b></td></tr>${d.sit?`<tr><td>Retenue de garantie ${esc(d.sit.rgPct)} %</td><td class="n">− ${money(d.sit.rg,d.cur)}</td></tr>${+d.sit.remb?`<tr><td>Remboursement de l'avance</td><td class="n">− ${money(d.sit.remb,d.cur)}</td></tr>`:''}<tr><td><b>Net à payer</b></td><td class="n"><b>${money(t.net,d.cur)}</b></td></tr>`:''}${d.type==='F'&&d.st==='E'&&(docPaid(d)||docAvoirs(d))?`<tr><td>Avoirs et paiements reçus</td><td class="n">${money(docAvoirs(d)+docPaid(d),d.cur)}</td></tr><tr><td><b>Reste à payer</b></td><td class="n"><b>${money(docDue(d),d.cur)}</b></td></tr>`:''}${d.cur!==BASE()?`<tr><td class="small">Contre-valeur au taux ${fmt(d.rate)}</td><td class="n small">${money(toBase(t.ttc,d.cur,d.rate))}</td></tr>`:''}</table>
+  <p>Arrêté${d.type==='D'?' le présent devis':'e la présente facture'} à la somme de : <b>${esc(montantLettres(d.sit?t.net:t.ttc,d.cur))}</b>.</p>
   ${d.notes?`<p>${esc(d.notes).replace(/\n/g,'<br>')}</p>`:''}<p class="small">${esc(S.mentions)}</p>
   <div class="sig">Pour ${esc(S.nom)}<br>${S.signature&&RX.img.test(S.signature)&&d.st!=='B'?`<img src="${S.signature}" alt="Signature">`:'<br><br>'}<br>${ger?esc(ger.nom)+', Gérant':''}</div>
   <div class="foot">${esc(S.nom)} · ${esc(S.adresse)}${S.rccm?' · RCCM '+esc(S.rccm):''}</div></div>`;
@@ -1057,8 +1077,10 @@ function stockOf(it,end){
   return {q:Math.round(q*1000)/1000,v:r2(v),cmup:q>0?v/q:0}});
 }
 function stocks(){
-  const seg=`<div class="seg"><button class="${sub.actif!=='I'?'on':''}" data-act="sub" data-k="actif" data-v="S">Stocks</button>${perm('immo')?`<button class="${sub.actif==='I'?'on':''}" data-act="sub" data-k="actif" data-v="I">Immobilisations</button>`:''}</div>`;
+  const seg=`<div class="seg"><button class="${!['I','D','P'].includes(sub.actif)?'on':''}" data-act="sub" data-k="actif" data-v="S">Stocks</button><button class="${sub.actif==='D'?'on':''}" data-act="sub" data-k="actif" data-v="D">Dépôts</button><button class="${sub.actif==='P'?'on':''}" data-act="sub" data-k="actif" data-v="P">Inventaire physique</button>${perm('immo')?`<button class="${sub.actif==='I'?'on':''}" data-act="sub" data-k="actif" data-v="I">Immobilisations</button>`:''}</div>`;
   if(sub.actif==='I'&&perm('immo'))return '<h2>Immobilisations</h2>'+seg+immoView();
+  if(sub.actif==='D')return '<h2>Stocks par dépôt</h2>'+seg+depView();
+  if(sub.actif==='P')return '<h2>Inventaire physique</h2>'+seg+invsView();
   return stocks0().replace('<h2>Stocks</h2>','<h2>Stocks</h2>'+seg);
 }
 function stocks0(){
@@ -1068,7 +1090,7 @@ function stocks0(){
   return `<h2>Stocks</h2><p class="muted">Valeur du stock (coût moyen pondéré, en ${BASE()}) : <b>${money(tot)}</b></p>
   <div class="btns"><button class="pr" data-act="item">+ Nouvel article</button>${its.length?`<button data-act="move" data-k="E">Entrée</button><button data-act="move" data-k="S">Sortie</button><button class="ghost" data-act="move" data-k="I">Inventaire</button>`:''}</div>
   ${its.length?`<table class="stack"><thead><tr><th>Article</th><th>Catégorie</th><th class="n">Quantité</th><th class="n">Coût moyen</th><th class="n">Valeur</th><th></th></tr></thead><tbody>${its.map(i=>{const s=stockOf(i),low=+i.seuil>0&&s.q<=+i.seuil;return `<tr><td><b>${esc(i.nom)}</b>${low?' <span class="tag r">Stock bas</span>':''}${i.actif===false?' <span class="tag">Archivé</span>':''}<br><span class="small muted">${esc(actNom(i.act))}</span></td><td>${esc(STK[i.cat]?.l||'')}</td><td class="n">${fmtQ(s.q)} ${esc(i.unite)}</td><td class="n">${fmt(s.cmup)}</td><td class="n">${money(s.v)}</td><td><button class="ghost" data-act="item" data-id="${esc(i.id)}">Modifier</button></td></tr>`}).join('')}</tbody></table>`:'<p class="empty">Ajoutez vos articles : aliments, poussins, semences, câbles, panneaux, tissu, peinture…</p>'}
-  ${mv.length?`<h3>Derniers mouvements</h3><table class="stack"><thead><tr><th>Date</th><th>Article</th><th>Mouvement</th><th class="n">Quantité</th><th></th></tr></thead><tbody>${mv.map(m=>{const it=byId('items',m.item)||{};return `<tr><td>${dfr(m.date)}</td><td>${esc(it.nom)}</td><td>${{E:'Entrée',S:'Sortie',I:'Inventaire'}[m.type]||''}${m.motif?' — '+esc(m.motif):''}${m.st==='X'?' <span class="tag r">Annulé</span>':''}</td><td class="n">${fmtQ(m.q)} ${esc(it.unite||'')}</td><td>${m.st==='V'&&(isAdmin()||m.cr===ME)&&!locked(m.date)?`<button class="dg" data-act="cancelMove" data-id="${esc(m.id)}">Annuler</button>`:''}</td></tr>`}).join('')}</tbody></table>`:''}
+  ${mv.length?`<h3>Derniers mouvements</h3><table class="stack"><thead><tr><th>Date</th><th>Article</th><th>Mouvement</th><th class="n">Quantité</th><th></th></tr></thead><tbody>${mv.map(m=>{const it=byId('items',m.item)||{};return `<tr><td>${dfr(m.date)}</td><td>${esc(it.nom)}</td><td>${{E:'Entrée',S:'Sortie',I:'Inventaire',T:'Transfert'}[m.type]||''}${m.type==='T'?' '+esc(depNom(m.dep))+' → '+esc(depNom(m.dep2)):m.dep?' · '+esc(depNom(m.dep)):''}${m.motif?' — '+esc(m.motif):''}${m.st==='X'?' <span class="tag r">Annulé</span>':''}</td><td class="n">${fmtQ(m.q)} ${esc(it.unite||'')}</td><td>${m.st==='V'&&(isAdmin()||m.cr===ME)&&!locked(m.date)?`<button class="dg" data-act="cancelMove" data-id="${esc(m.id)}">Annuler</button>`:''}</td></tr>`}).join('')}</tbody></table>`:''}
   ${isAdmin()?`<h3>Clôture de l'exercice ${EX()}</h3><p class="muted small">Après l'inventaire physique de fin d'année, cette écriture passe la variation des stocks (comptes 31 à 36 contre 6031, 6032, 6033 et 736), méthode de l'inventaire intermittent du SYSCOHADA. Une nouvelle génération contrepasse la précédente.</p><button data-act="variation">Générer l'écriture de variation des stocks</button>`:''}`;
 }
 function itemForm(id){
@@ -1085,6 +1107,7 @@ function moveForm(k){
   const its=live(D.items).filter(i=>i.actif!==false).sort((a,b)=>a.nom.localeCompare(b.nom));
   openSheet(`<h2>${{E:'Entrée en stock',S:'Sortie de stock',I:'Inventaire (quantité comptée)'}[k]}</h2><form id="fmv" data-k="${k}">
   <label class="f">Article<select name="item" required>${its.map(i=>`<option value="${esc(i.id)}">${esc(i.nom)} (${fmtQ(stockOf(i).q)} ${esc(i.unite)})</option>`).join('')}</select></label>
+  ${depSelect('dep','')}
   <div class="row2"><label class="f">Date<input type="date" name="date" value="${today()}" required></label><label class="f">${k==='I'?'Quantité comptée':'Quantité'}<input type="number" name="q" step="any" min="0" required inputmode="decimal"></label></div>
   ${k!=='S'?`<label class="f">Prix unitaire en ${BASE()}${k==='I'?' (si le stock était vide)':''}<input type="number" name="pu" step="0.01" min="0" inputmode="decimal" ${k==='E'?'required':''}></label>`:''}
   ${k==='S'?`<label class="f">Motif<select name="motif"><option>Consommation</option><option>Vente</option><option>Perte / mortalité</option><option>Utilisé sur chantier</option></select></label>`:''}
@@ -1123,7 +1146,9 @@ function paie(){
   if(!perm('paie'))return '<h2>Paie</h2><p class="muted">Votre rôle ne donne pas accès à la paie.</p>';
   const emps=live(D.emps).sort((a,b)=>a.nom.localeCompare(b.nom)),mois=sub.mois||today().slice(0,7);
   const sl=live(D.slips).filter(s=>s.mois===mois);
-  return `<h2>Paie</h2><div class="seg"><button class="${sub.paie!=='E'?'on':''}" data-act="sub" data-k="paie" data-v="B">Bulletins</button><button class="${sub.paie==='E'?'on':''}" data-act="sub" data-k="paie" data-v="E">Employés (${emps.length})</button></div>
+  const PSEG=`<div class="seg"><button class="${!['E','C','P','A'].includes(sub.paie)?'on':''}" data-act="sub" data-k="paie" data-v="B">Bulletins</button><button class="${sub.paie==='E'?'on':''}" data-act="sub" data-k="paie" data-v="E">Employés (${emps.length})</button><button class="${sub.paie==='C'?'on':''}" data-act="sub" data-k="paie" data-v="C">Congés</button><button class="${sub.paie==='P'?'on':''}" data-act="sub" data-k="paie" data-v="P">Présences</button><button class="${sub.paie==='A'?'on':''}" data-act="sub" data-k="paie" data-v="A">Avances et prêts</button></div>`;
+  if(['C','P','A'].includes(sub.paie))return '<h2>Paie et personnel</h2>'+PSEG+({C:cgView,P:presView,A:pretView})[sub.paie]();
+  return `<h2>Paie et personnel</h2>${PSEG}
   ${sub.paie==='E'?`<div class="btns"><button class="pr" data-act="emp">+ Nouvel employé</button></div>
   ${emps.length?`<table class="stack"><thead><tr><th>Nom</th><th>Poste</th><th>Activité</th><th class="n">Salaire de base</th><th></th></tr></thead><tbody>${emps.map(e=>`<tr><td><b>${esc(e.nom)}</b>${e.actif===false?' <span class="tag">Inactif</span>':''}</td><td>${esc(e.poste)}</td><td>${esc(actNom(e.act))}</td><td class="n">${money(e.base,e.cur)}</td><td><button class="ghost" data-act="emp" data-id="${esc(e.id)}">Modifier</button></td></tr>`).join('')}</tbody></table>`:'<p class="empty">Ajoutez vos ouvriers et employés.</p>'}`:`
   <label class="f" style="max-width:240px">Mois<input type="month" id="pmois" value="${esc(mois)}"></label>
@@ -1137,7 +1162,7 @@ function empForm(id){
   <label class="f">Nom complet<input name="nom" value="${esc(e.nom)}" required maxlength="120"></label>
   <div class="row2"><label class="f">Poste<input name="poste" value="${esc(e.poste)}" maxlength="80"></label><label class="f">Téléphone<input name="tel" value="${esc(e.tel)}" inputmode="tel" maxlength="40"></label></div>
   <div class="row2"><label class="f">Salaire de base mensuel<input type="number" name="base" step="0.01" min="0" value="${e.base||''}" required></label><label class="f">Devise du salaire<select name="cur">${optCur(e.cur)}</select></label></div>
-  <div class="row2"><label class="f">N° CNSS<input name="cnss" value="${esc(e.cnss)}" maxlength="40"></label><label class="f">Personnes à charge (IPR)<input type="number" name="pac" step="1" min="0" max="20" value="${esc(e.pac||0)}"></label><label class="f">Activité<select name="act">${optActs(e.act)}</select></label></div>
+  <div class="row2"><label class="f">N° CNSS<input name="cnss" value="${esc(e.cnss)}" maxlength="40"></label><label class="f">Personnes à charge (IPR)<input type="number" name="pac" step="1" min="0" max="20" value="${esc(e.pac||0)}"></label><label class="f">Date d'embauche<input type="date" name="emb" value="${esc(e.emb||'')}"></label><label class="f">Congés reportés de l'an passé (jours)<input type="number" name="cgReport" step="0.5" min="0" value="${esc(e.cgReport||0)}"></label><label class="f">Activité<select name="act">${optActs(e.act)}</select></label></div>
   <label class="chk"><input type="checkbox" name="actif" ${e.actif!==false?'checked':''}> Employé actif</label>
   <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`);
 }
@@ -1271,6 +1296,10 @@ function reglages(){
     <h3>Contrôle interne</h3>
     <div class="row2"><label class="f">Demandes d'achat approuvées par le gérant à partir de (${BASE()})<input type="number" name="seuil1" step="1" min="0" value="${esc(S.seuil1||'')}" placeholder="ex. 1 000 000"></label><label class="f">Paiements soumis à deux validations à partir de (${BASE()})<input type="number" name="seuil2" step="1" min="0" value="${esc(S.seuil2||'')}" placeholder="ex. 5 000 000"></label></div>
     <p class="small muted">Laissez vide pour désactiver. La double validation exige au moins deux personnes ayant le droit de valider (gérant et comptable, par exemple).</p>
+    <div class="row2"><label class="f">Seuil d'alerte de trésorerie (${BASE()})<input type="number" name="seuilTreso" step="1" min="0" value="${esc(S.seuilTreso||'')}"></label><label class="f">Retard toléré sur l'avancement des tâches (%)<input type="number" name="tolRetard" step="1" min="0" max="50" value="${esc(S.tolRetard??15)}"></label></div>
+    <h3>Personnel</h3>
+    <div class="row2"><label class="f">Congé : jours ouvrables par mois de service<input type="number" name="cgMois" step="0.5" min="0" value="${esc(S.cgMois??1)}"></label><label class="f">Congé : jours en plus par 5 ans d'ancienneté<input type="number" name="cgAnc" step="0.5" min="0" value="${esc(S.cgAnc??1)}"></label></div>
+    <label class="f">Jours fériés légaux (MM-JJ libellé ; séparés par des points-virgules)<textarea name="feries" maxlength="1500">${esc(S.feries||FERIES_RDC)}</textarea></label>
     <label class="f">Mentions en bas des factures<textarea name="mentions" maxlength="500">${esc(S.mentions)}</textarea></label>
     <label class="f">Engagements hors bilan et événements postérieurs (notes annexes)<textarea name="annexe" maxlength="500" placeholder="Néant à la connaissance de la direction…">${esc(S.annexe||'')}</textarea></label>
     <div class="row2"><label class="f">Logo (PNG ou JPEG)<input type="file" accept="image/png,image/jpeg" id="logo"></label><label class="f">Signature scannée<input type="file" accept="image/png,image/jpeg" id="sig"></label></div>
@@ -1326,7 +1355,7 @@ function pilotage(){
   </div>`;
 }
 function plusView(){
-  const T=[['direction','Direction','Tableau de bord interactif, budgets, objectifs, rapports PDF'],['achats','Achats','Demandes, approbations, bons de commande, réceptions'],['stocks','Actifs','Stocks, immobilisations'],['paie','Paie','Employés, bulletins'],['etats','États financiers','Bilan, résultat, journal, TVA, rapprochement'],['reglages','Réglages','Synchronisation, utilisateurs, rôles, clôture, audit']];
+  const T=[['direction','Direction','Tableau de bord interactif, budgets, objectifs, rapports PDF'],['achats','Achats','Demandes, approbations, bons de commande, réceptions'],['materiel','Matériel','Entretiens préventifs, réparations, carburant'],['stocks','Actifs','Stocks, immobilisations'],['paie','Paie','Employés, bulletins'],['etats','États financiers','Bilan, résultat, journal, TVA, rapprochement'],['reglages','Réglages','Synchronisation, utilisateurs, rôles, clôture, audit']];
   if(DEMO)T.push(['demoX','Quitter la démo','Revenir à ma vraie société']);else T.push(['demoO','Démonstration','Société fictive remplie d\'exemples pour comprendre chaque rubrique']);
   return `<h2>Plus</h2><div class="tiles">${T.map(([v,l,d])=>`<button ${v==='demoX'?'data-act="demoExit"':v==='demoO'?'data-act="demoOpen"':`data-go="${v}"`}>${l}<span>${d}</span></button>`).join('')}</div>`;
 }
@@ -1549,7 +1578,7 @@ function moveCosts(){if(MCOST.v===VER)return MCOST.m;const m={};
     if(mv.type==='E'){v+=n*(+mv.pu||0);q+=n}else if(mv.type==='S'){const c=q>0?v/q:0;m[mv.id]=r2(c*n);v-=c*n;q-=n}else if(mv.type==='I'){if(q>0)v=v/q*n;else v=n*(+mv.pu||0);q=n}}}
   MCOST={v:VER,m};return m}
 function chStats(p){
-  const docs=live(D.docs).filter(d=>d.proj===p.id),fac=docs.filter(d=>d.type==='F'&&d.st==='E'),av=docs.filter(d=>d.type==='A'&&d.st==='E');
+  const docs=live(D.docs).filter(d=>d.proj===p.id),fac=docs.filter(d=>d.type==='F'&&d.st==='E'&&!d.rgRel),av=docs.filter(d=>d.type==='A'&&d.st==='E');
   const ht=d=>toBase(docTot(d).ht,d.cur,d.rate);
   const facture=r2(fac.reduce((s,d)=>s+ht(d),0)-av.reduce((s,d)=>s+ht(d),0));
   const encaisse=r2(live(D.pays).filter(x=>x.st==='V'&&fac.some(d=>d.id===x.doc)).reduce((s,x)=>s+toBase(x.mt,x.cur,x.rate),0));
@@ -1557,23 +1586,24 @@ function chStats(p){
   const cStock=r2(mats.reduce((s,m)=>s+(mc[m.id]||0),0));
   const ops=live(D.chops).filter(o=>o.proj===p.id);let mo=0,mat=0,dep=0,jours=0;
   for(const o of ops){if(o.type==='MO'){mo+=+o.cout||0;jours+=(+o.jours||0)*(+o.nb||1)}else if(o.type==='MAT')mat+=+o.cout||0;else dep+=+o.cout||0}
-  const cost=r2(cStock+mo+mat+dep),base=facture||+p.montant||0;
-  return {docs,facture,encaisse,mats,cStock,ops,mo:r2(mo),mat:r2(mat),dep:r2(dep),jours,cost,marge:r2(base-cost),tx:base?(base-cost)/base*100:0,devis:docs.filter(d=>d.type==='D')};
+  const st=r2(live(D.stcs||[]).filter(c=>c.proj===p.id).reduce((a,c)=>a+stcStats(c).real,0));
+  const cost=r2(cStock+mo+mat+dep+st),base=facture||+p.montant||0;
+  return {st,docs,facture,encaisse,mats,cStock,ops,mo:r2(mo),mat:r2(mat),dep:r2(dep),jours,cost,marge:r2(base-cost),tx:base?(base-cost)/base*100:0,devis:docs.filter(d=>d.type==='D')};
 }
 function elecView(pt){
   const cs=live(D.projects).filter(p=>p.kind==='chantier'&&isPeint(p)===!!pt),v=sub.chv||'pipe',can=perm('chantiers')||perm('projets')||(pt&&perm('atelier'));
-  const open=cs.filter(p=>!['Clôturé','Prospect'].includes(p.statut)),carnet=r2(cs.filter(p=>['Accepté','En cours','Réceptionné'].includes(p.statut)).reduce((s,p)=>s+Math.max(0,(+p.montant||0)-chStats(p).facture),0));
+  const open=cs.filter(p=>!['Clôturé','Prospect','Perdu'].includes(p.statut)),carnet=r2(cs.filter(p=>['Accepté','En cours','Réceptionné'].includes(p.statut)).reduce((s,p)=>s+Math.max(0,(+p.montant||0)-chStats(p).facture),0));
   let fact=0,cost=0;for(const p of cs){const s=chStats(p);fact+=s.facture;cost+=s.cost}
-  const pros=cs.filter(p=>['Prospect','Devis envoyé'].includes(p.statut)).reduce((s,p)=>s+(+p.montant||0),0),won=cs.filter(p=>!['Prospect','Devis envoyé'].includes(p.statut)).length,sent=cs.filter(p=>p.statut!=='Prospect').length;
+  const pros=cs.filter(p=>['Prospect','Devis envoyé'].includes(p.statut)).reduce((s,p)=>s+(+p.montant||0),0),won=cs.filter(p=>!['Prospect','Devis envoyé','Perdu'].includes(p.statut)).length,pond=r2(cs.filter(p=>['Prospect','Devis envoyé'].includes(p.statut)).reduce((s,p)=>s+(+p.montant||0)*CHPROB[p.statut]/100,0)),sent=cs.filter(p=>p.statut!=='Prospect').length;
   const head=`<div class="kpis"><div class="kpi"><div class="l">Chantiers actifs</div><div class="v">${open.length}</div></div><div class="kpi"><div class="l">Carnet de commandes</div><div class="v">${money(carnet)}</div></div>
-  <div class="kpi"><div class="l">Devis en attente</div><div class="v">${money(pros)}</div></div><div class="kpi"><div class="l">Taux de transformation</div><div class="v">${sent?Math.round(won/sent*100):0} %</div></div>
+  <div class="kpi"><div class="l">Devis en attente</div><div class="v">${money(pros)}</div><div class="small muted">pondéré ${money(pond)}</div></div><div class="kpi"><div class="l">Taux de transformation</div><div class="v">${sent?Math.round(won/sent*100):0} %</div></div>
   <div class="kpi"><div class="l">Facturé (HT)</div><div class="v">${money(fact)}</div></div><div class="kpi"><div class="l">Marge des chantiers</div><div class="v ${fact-cost<0?'neg':''}">${money(fact-cost)}</div></div></div>
   ${can?`<div class="btns"><button class="pr" data-act="chantier" data-k="${pt?'peint':'elec'}">+ Nouveau chantier${pt?' de peinture':''}</button></div>`:''}
   <div class="seg"><button class="${v==='pipe'?'on':''}" data-act="sub" data-k="chv" data-v="pipe">Pipeline</button><button class="${v==='list'?'on':''}" data-act="sub" data-k="chv" data-v="list">Rentabilité</button><button class="${v==='gantt'?'on':''}" data-act="sub" data-k="chv" data-v="gantt">Planning</button></div>`;
   if(!cs.length)return head+'<p class="empty">Créez votre premier chantier : client, type de travaux, montant du marché. Les tâches types du métier sont proposées automatiquement.</p>';
-  if(v==='gantt')return head+zoomSeg()+gantt(cs.filter(p=>p.statut!=='Clôturé').map(p=>{const s=projStats(p);return {id:p.id,label:p.nom,sub:tiersNom(p.client)||p.ctype||'',debut:p.debut,fin:p.fin,av:s.av,late:s.late>0||(p.fin<today()&&!['Réceptionné','Facturé','Clôturé'].includes(p.statut)),act:'openProj'}}),UI.gz||'S');
+  if(v==='gantt')return head+zoomSeg()+gantt(cs.filter(p=>p.statut!=='Clôturé'&&p.statut!=='Perdu').map(p=>{const s=projStats(p);return {id:p.id,label:p.nom,sub:tiersNom(p.client)||p.ctype||'',debut:p.debut,fin:p.fin,av:s.av,late:s.late>0||(p.fin<today()&&!['Réceptionné','Facturé','Clôturé'].includes(p.statut)),act:'openProj'}}),UI.gz||'S');
   if(v==='list')return head+`<div class="scroll"><table><thead><tr><th>Chantier</th><th class="n">Marché</th><th class="n">Facturé</th><th class="n">Coûts</th><th class="n">Marge</th><th class="n">%</th></tr></thead><tbody>${cs.map(p=>{const s=chStats(p);return `<tr data-act="openProj" data-id="${esc(p.id)}" style="cursor:pointer"><td><b>${esc(p.nom)}</b><br><span class="small muted">${esc(p.statut)}</span></td><td class="n">${fmt(p.montant)}</td><td class="n">${fmt(s.facture)}</td><td class="n">${fmt(s.cost)}</td><td class="n ${s.marge<0?'neg':''}">${fmt(s.marge)}</td><td class="n">${Math.round(s.tx)}</td></tr>`}).join('')}</tbody></table></div><p class="small muted">Marge = facturé HT (ou montant du marché tant que rien n'est facturé) − coûts : matériel sorti du stock au coût moyen, matériel acheté, main-d'œuvre et dépenses du chantier.</p>`;
-  return head+`<div class="scroll" style="display:flex;gap:10px;padding-bottom:8px;align-items:flex-start">${CHSTAT.map(st=>{const l=cs.filter(p=>p.statut===st);return `<div style="flex:none;width:230px;background:var(--pn);border:1px solid var(--ln);border-radius:4px;padding:8px"><div class="top" style="display:flex;justify-content:space-between;font-weight:800;font-size:14px;margin-bottom:6px"><span>${st}</span><span class="muted">${l.length}</span></div><div class="small muted" style="margin-bottom:6px">${money(l.reduce((s,p)=>s+(+p.montant||0),0))}</div>
+  return head+`<div class="scroll" style="display:flex;gap:10px;padding-bottom:8px;align-items:flex-start">${[...CHSTAT,'Perdu'].map(st=>{const l=cs.filter(p=>p.statut===st);return `<div style="flex:none;width:230px;background:var(--pn);border:1px solid var(--ln);border-radius:4px;padding:8px"><div class="top" style="display:flex;justify-content:space-between;font-weight:800;font-size:14px;margin-bottom:6px"><span>${st}</span><span class="muted">${l.length}</span></div><div class="small muted" style="margin-bottom:6px">${money(l.reduce((s,p)=>s+(+p.montant||0),0))}</div>
     ${l.map(p=>{const s=projStats(p);return `<div class="card" data-act="openProj" data-id="${esc(p.id)}" style="cursor:pointer;background:var(--bg);margin-bottom:6px"><b style="font-size:14px">${esc(p.nom)}</b><div class="small muted">${esc(tiersNom(p.client))} · ${money(p.montant)}</div><div class="small muted">${dfr(p.debut)} → ${dfr(p.fin)}</div><div class="prog" style="margin-top:6px"><i style="width:${s.av}%"></i></div></div>`}).join('')||'<div class="small muted">—</div>'}</div>`}).join('')}</div><p class="small muted">Faites glisser horizontalement pour voir toutes les étapes. Touchez un chantier pour l'ouvrir et le faire avancer.</p>`;
 }
 function chantierForm(id){const pt=id?isPeint(byId('projects',id)):sub.chm==='peint',TY=pt?PTYPE:CHTYPE;const p=id?byId('projects',id):{id:'',nom:'',client:'',ctype:TY[0],surf:'',couches:2,rend:10,adresse:'',kwc:'',debut:today(),fin:addDays(today(),21),montant:0,statut:'Prospect',resp:ME,desc:''};
@@ -1598,15 +1628,16 @@ async function saveChantier(f,F){
   closeSheet();sub.pid=p.id;go('projet');
 }
 function chantierBlock(p){
-  const s=chStats(p),can=perm('chantiers')||perm('projets')||(isPeint(p)&&perm('atelier')),i=CHSTAT.indexOf(p.statut),next=CHSTAT[i+1];
-  return `<div class="card" style="background:var(--pn)"><div class="top"><b>Étape : ${esc(p.statut)}</b>${can&&next?`<button class="pr" data-act="chNext" data-id="${esc(p.id)}">Passer à « ${esc(next)} »</button>`:''}</div>
+  const s=chStats(p),can=perm('chantiers')||perm('projets')||(isPeint(p)&&perm('atelier')),i=CHSTAT.indexOf(p.statut),next=i<0?null:CHSTAT[i+1];
+  return `<div class="card" style="background:var(--pn)"><div class="top"><b>Étape : ${esc(p.statut)}${p.statut==='Perdu'?` <span class="tag r">${esc(p.perdu||'')}</span>`:''}</b><span>${can&&next?`<button class="pr" data-act="chNext" data-id="${esc(p.id)}">Passer à « ${esc(next)} »</button>`:''}${can&&['Prospect','Devis envoyé'].includes(p.statut)?` <button class="ghost" data-act="chLost" data-id="${esc(p.id)}">Marquer perdu</button>`:''}</span></div>
    <div style="display:flex;gap:3px;margin-top:10px">${CHSTAT.map((x,j)=>`<div title="${x}" style="flex:1;height:6px;border-radius:2px;background:${j<=i?'var(--ink)':'var(--ln)'}"></div>`).join('')}</div>
    <div class="small muted" style="margin-top:6px">${esc(p.ctype||'')}${p.kwc?' · '+fmt(p.kwc)+' kWc':''}${p.surf?' · '+fmt(p.surf)+' m² × '+p.couches+' couche(s) ≈ <b>'+fmtQ(Math.ceil(p.surf*p.couches/(p.rend||10)))+' L de peinture</b>':''}${p.adresse?' · '+esc(p.adresse):''} · client <b>${esc(tiersNom(p.client))}</b></div></div>
   <div class="kpis"><div class="kpi"><div class="l">Marché HT</div><div class="v">${money(p.montant)}</div></div><div class="kpi"><div class="l">Facturé HT</div><div class="v">${money(s.facture)}</div></div>
   <div class="kpi"><div class="l">Encaissé</div><div class="v">${money(s.encaisse)}</div></div><div class="kpi"><div class="l">Coûts</div><div class="v">${money(s.cost)}</div></div>
   <div class="kpi"><div class="l">Marge</div><div class="v ${s.marge<0?'neg':''}">${money(s.marge)}</div></div><div class="kpi"><div class="l">Taux de marge</div><div class="v">${Math.round(s.tx)} %</div></div></div>
-  <div class="bars">${[['Matériel du stock',s.cStock],['Matériel acheté',s.mat],['Main-d\'œuvre ('+fmtQ(s.jours)+' j-h)',s.mo],['Autres dépenses',s.dep]].map(([l,v])=>`<div class="row" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 110px"><div>${l}</div><div class="tr"><div class="b p" style="width:${W(v,Math.max(1,s.cost))}"></div></div><div class="n">${money(v)}</div></div>`).join('')}</div>
+  <div class="bars">${[['Matériel du stock',s.cStock],['Matériel acheté',s.mat],['Main-d\'œuvre ('+fmtQ(s.jours)+' j-h)',s.mo],['Sous-traitance',s.st],['Autres dépenses',s.dep]].map(([l,v])=>`<div class="row" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 110px"><div>${l}</div><div class="tr"><div class="b p" style="width:${W(v,Math.max(1,s.cost))}"></div></div><div class="n">${money(v)}</div></div>`).join('')}</div>
   ${can?`<div class="btns" style="margin-top:12px"><button data-act="chDevis" data-id="${esc(p.id)}">+ Devis</button><button data-act="chop" data-k="MO" data-id="${esc(p.id)}">+ Main-d'œuvre</button><button data-act="chop" data-k="MAT" data-id="${esc(p.id)}">+ Matériel acheté</button><button data-act="chMat" data-id="${esc(p.id)}">+ Sortie de stock</button><button class="ghost" data-act="chop" data-k="DEP" data-id="${esc(p.id)}">+ Dépense</button><button class="ghost" data-act="chantier" data-id="${esc(p.id)}">Modifier</button></div>`:''}
+  ${p.kind==='chantier'?sitBlock(p)+stcBlock(p):''}
   <h3>Devis et factures</h3>${s.docs.length?s.docs.map(d=>{const st=docStatus(d);return `<div class="card" data-act="openDoc" data-id="${esc(d.id)}" style="cursor:pointer"><div class="top"><span><b>${d.type==='D'?'Devis':d.type==='A'?'Avoir':'Facture'} ${esc(d.num||'(brouillon)')}</b> · ${dfr(d.date)}</span><span class="amt">${money(docTot(d).ttc,d.cur)}</span></div><span class="tag ${st[0]}">${st[1]}</span></div>`}).join(''):'<p class="muted">Aucun document. Faites le devis depuis ce chantier : il y sera rattaché, ainsi que la facture qui en sortira.</p>'}
   <h3>Matériel et dépenses</h3>${[...s.mats.map(m=>({d:m.date,t:'Stock',l:fmtQ(m.q)+' '+((byId('items',m.item)||{}).unite||'')+' '+((byId('items',m.item)||{}).nom||''),v:moveCosts()[m.id]||0})),...s.ops.map(o=>({d:o.date,t:CHOPS[o.type],l:o.lib+(o.type==='MO'?` · ${fmtQ(o.nb)} pers. × ${fmtQ(o.jours)} j`:''),v:o.cout,id:o.id,cr:o.cr}))].sort((a,b)=>b.d.localeCompare(a.d)).map(x=>`<div class="card"><div class="top"><span><b>${esc(x.t)}</b> · ${dfr(x.d)}</span><span class="amt">${money(x.v)}</span></div><div class="small muted">${esc(x.l)}</div>${x.id&&(isAdmin()||x.cr===ME)?`<button class="dg" style="margin-top:6px" data-act="delChop" data-id="${esc(x.id)}">Supprimer</button>`:''}</div>`).join('')||'<p class="muted">Rien pour l\'instant.</p>'}`;
 }
@@ -1625,6 +1656,7 @@ async function saveChop(f,F){
 function chMatForm(pid){const its=live(D.items).filter(i=>i.actif!==false&&stockOf(i).q>0);if(!its.length)return toast('Aucun article en stock');
   openSheet(`<h2>Sortie de stock imputée</h2><p class="small muted">${esc(jobById(pid).nom)}</p><form id="fchmat" data-p="${esc(pid)}">
   <label class="f">Article<select name="item">${its.map(i=>`<option value="${esc(i.id)}">${esc(i.nom)} (${fmtQ(stockOf(i).q)} ${esc(i.unite)} · ${money(stockOf(i).cmup)}/${esc(i.unite)})</option>`).join('')}</select></label>
+  ${depSelect('dep','','Depuis le dépôt')}
   <div class="row2"><label class="f">Quantité<input type="number" name="q" step="any" min="0" required inputmode="decimal"></label><label class="f">Date<input type="date" name="date" value="${today()}" required></label></div>
   <p class="small muted">Le matériel est valorisé au coût moyen pondéré et imputé à ce travail.</p>
   <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
@@ -1729,8 +1761,8 @@ function chartSVG(data,print){
   return s+`</svg><div class="legend"><span><i style="background:${ink}"></i>Produits</span><span><i style="background:${sl};opacity:.6"></i>Charges</span><span><i style="background:#e0a800"></i>Budget des produits</span></div>`}
 function direction(){
   if(!perm('etats'))return '<h2>Direction</h2><p class="muted">Votre rôle ne donne pas accès au pilotage de direction.</p>';
-  const t=sub.dv||'tdb',T={tdb:'Tableau de bord',bud:'Budgets',obj:'Objectifs',rap:'Rapports mensuels'};
-  return `<h2>Direction</h2><div class="seg">${Object.entries(T).map(([k,l])=>`<button class="${k===t?'on':''}" data-act="sub" data-k="dv" data-v="${k}">${l}</button>`).join('')}</div>`+({tdb:tdbView,bud:budView,obj:objView,rap:rapView})[t]();
+  const t=sub.dv||'tdb',T={tdb:'Tableau de bord',prev:'Trésorerie prévue',bud:'Budgets',obj:'Objectifs',rap:'Rapports mensuels'};
+  return `<h2>Direction</h2><div class="seg">${Object.entries(T).map(([k,l])=>`<button class="${k===t?'on':''}" data-act="sub" data-k="dv" data-v="${k}">${l}</button>`).join('')}</div>`+({tdb:tdbView,prev:prevView,bud:budView,obj:objView,rap:rapView})[t]();
 }
 function tdbView(){
   const P=periode(),act=sub.ta||'',cm=sub.tc||'bud',K=perKpi(P.from,P.to,act);let C,cl;
@@ -1742,7 +1774,7 @@ function tdbView(){
   const data=yms.map(mo=>{const k=perKpi(mo+'-01',lastDay(mo),act);return {mo,l:MOIS[+mo.slice(5)-1],p:k.p,c:k.c,b:budPer([mo],act).p,on:P.ms.includes(mo)}});
   const acts=live(D.acts).map(a=>({a,k:perKpi(P.from,P.to,a.id),b:budPer(P.ms,a.id)})).filter(x=>x.k.p||x.k.c||x.b.p||x.b.c);const amx=Math.max(1,...acts.map(x=>Math.abs(x.k.r)));
   const m=perBal(P.from,P.to,act),chs=Object.keys(m).filter(c=>CHG.some(p=>c.startsWith(p))).map(c=>[c,r2(m[c].d-m[c].k)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,8),cmx=Math.max(1,...chs.map(x=>x[1]));
-  const cl5={};for(const d of live(D.docs))if(d.type!=='D'&&d.st==='E'&&d.date>=P.from&&d.date<=P.to&&(!act||d.act===act)){const v=toBase(docTot(d).ht,d.cur,d.rate)*(d.type==='A'?-1:1);cl5[d.client]=(cl5[d.client]||0)+v}
+  const cl5={};for(const d of live(D.docs))if(d.type!=='D'&&!d.rgRel&&d.st==='E'&&d.date>=P.from&&d.date<=P.to&&(!act||d.act===act)){const v=toBase(docTot(d).ht,d.cur,d.rate)*(d.type==='A'?-1:1);cl5[d.client]=(cl5[d.client]||0)+v}
   const top=Object.entries(cl5).sort((a,b)=>b[1]-a[1]).slice(0,5),tmx=Math.max(1,...top.map(x=>x[1]));
   return `<div class="row2" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
    <label class="f">Période${opt('tp',[['m','Le mois'],['q','Le trimestre'],['ytd','Depuis janvier'],['y','L\'année entière']],P.t)}</label>
@@ -2208,28 +2240,330 @@ async function seedDemo(){
   await obj({lib:'Résultat de la société : 15 millions',metric:'res',cible:'15000000'});
   await obj({lib:'Garder la trésorerie au-dessus de 10 millions',metric:'tre',cible:'10000000'});
   await obj({lib:'Récolter 6 tonnes de gombo',metric:'man',act:A.ferme,cible:'6000',unite:'kg',actuel:String(Math.round(cycleStats(byId('cycles',cG)).kg))});
+  // 15. Étape 7 : marché avec situations, sous-traitant, créances, dépôts, inventaire, matériel, RH
+  await ensureAccs();
+  await commitSettings({...D.settings,seuilTreso:10000000},'seuil trésorerie','');
+  {const tc=JSON.parse(JSON.stringify(byId('tiers',C('Clinique Espoir'))));tc.plafond=10000000;await commit('tiers',tc,'plafond',tc.nom)}
+  await S('ft',{type:'C',nom:'Commune de Kampemba (fictive)',tel:'',adresse:'Lubumbashi',nif:'',plafond:''});await S('ft',{type:'F',nom:'Génie civil Mutoni (fictif)',tel:'',adresse:'Lubumbashi',nif:'',plafond:''});
+  {const p=await chant({nom:'Éclairage solaire public — Commune de Kampemba',client:C('Commune de Kampemba (fictive)'),ctype:'Installation solaire',debut:dt(9,15),fin:addDays(T,30),montant:'26000000',statut:'En cours'});
+   await setAv(p,0.55);const x=JSON.parse(JSON.stringify(byId('projects',p.id)));x.dqe=[{id:uid(),des:'Lampadaires solaires autonomes 60 W fournis et posés',u:'u',q:40,pu:450000},{id:uid(),des:'Massifs béton et ancrages',u:'u',q:40,pu:120000},{id:uid(),des:'Câblage et coffrets',u:'ens',q:1,pu:2000000},{id:uid(),des:'Mise en service, essais et formation',u:'ens',q:1,pu:1200000}];x.avPct=20;x.rgPct=5;x.montant=dqeTot(x);await commit('projects',x,'postes du marché',x.nom);
+   await saveAv(FK('fav',{p:p.id}),{mt:'5200000',date:dt(9,20),tr:'5212'});
+   const q=byId('projects',p.id),F={du:dt(9,15),au:dt(10,31)};F['c_'+q.dqe[0].id]='15';F['c_'+q.dqe[1].id]='25';F['c_'+q.dqe[2].id]='0.3';F['c_'+q.dqe[3].id]='0';await saveSit(FK('fsit',{p:p.id}),F);
+   const s1=sits(byId('projects',p.id))[0];await pay(s1.id,4000000,dt(11,12));
+   await saveStc(FK('fstc',{p:p.id}),{tiers:C('Génie civil Mutoni (fictif)'),objet:'Massifs béton des lampadaires',montant:'4000000',rgPct:'5',debut:dt(9,20),fin:addDays(T,10)});
+   const c=live(D.stcs).at(-1);await saveStop(FK('fstop',{k:'AT',c:c.id}),{date:dt(10,30),av:'60',lib:'25 massifs sur 40, conformes'});await saveStop(FK('fstop',{k:'PAY',c:c.id}),{date:dt(11,5),mt:'1500000',tr:'5212'})}
+  {const p=await chant({nom:'Solaire 3 kWc — École Les Étoiles (fictive)',client:C('Mme Ilunga'),ctype:'Installation solaire',kwc:'3',debut:dt(10,1),fin:dt(10,20),montant:'9500000',statut:'Devis envoyé'});const x=JSON.parse(JSON.stringify(byId('projects',p.id)));x.statut='Perdu';x.perdu='Concurrent moins cher de 15 %';await commit('projects',x,'affaire perdue',x.nom)}
+  {const f=live(D.docs).find(d=>d.type==='F'&&d.client===C('Clinique Espoir')&&d.st==='E');if(f)await saveRel(FK('frel',{id:f.id}),{date:dt(11,15),type:'Appel téléphonique',res:'Promesse de paiement',dprom:addDays(T,8),mprom:'6000000',note:'Le directeur financier paiera après le versement de la mutuelle'})}
+  await S('fprev',{sens:'S',mois:addMonths(T.slice(0,7),2),lib:'Achat d\'un véhicule utilitaire',mt:'18000000',rec:'1'});await S('fprev',{sens:'E',mois:addMonths(T.slice(0,7),1),lib:'Commandes de fin d\'année (couture)',mt:'1500000',rec:'2'});
+  await S('fdep',{nom:'Magasin du chantier',lieu:'Base vie, Kampemba',resp:ME});await S('fdep',{nom:'Atelier de couture',lieu:'Lubumbashi centre',resp:ME});
+  const dC=live(D.deps).find(d=>d.nom==='Magasin du chantier').id,dA=live(D.deps).find(d=>d.nom==='Atelier de couture').id;
+  await S('ftr',{item:I('Câble solaire 6 mm²'),dep:'',dep2:dC,q:'30',date:dt(11,10),motif:'Camionnette'});await S('ftr',{item:I('Wax hollandais'),dep:'',dep2:dA,q:'6',date:dt(11,10),motif:''});
+  {const it=byId('items',I('Peinture acrylique blanche')),th=depQ(it,'',dt(11,20)),c=r2(stockOf(it,dt(11,20)).cmup);const v={id:uid(),num:'INV-'+Y+'-'+LOC.code+'001',date:dt(11,20),dep:'',statut:'Ouvert',lignes:live(D.items).map(i=>({item:i.id,theo:depQ(i,'',dt(11,20)),cmup:r2(stockOf(i,dt(11,20)).cmup),c1:i.id===it.id?String(th-2):String(depQ(i,'',dt(11,20))),c2:'',just:i.id===it.id?'Fûts entamés, perte à l\'ouverture':''}))};
+   await commit('invs',v,'inventaire',v.num);await commit('moves',{id:uid(),date:v.date,item:it.id,type:'S',q:2,pu:0,motif:'Écart d\'inventaire '+v.num+' : fûts entamés',dep:'',inv:v.id,entryId:'',st:'V'},'écart',it.nom);const w=JSON.parse(JSON.stringify(v));w.statut='Validé';w.valid={date:v.date,by:ME};await commit('invs',w,'validation',w.num)}
+  const eq=async F=>{await S('feq',{unite:'h',cpt:'0',norme:'',act:A.elec,ref:'',...F},{id:''});return live(D.equips).find(e=>e.nom===F.nom)};
+  {const e=await eq({nom:'Groupe électrogène 20 kVA',type:'Groupe électrogène',unite:'h',cpt:'1240',norme:'4',act:A.elec,ref:'SN 20K-0042'});
+   await S('fgam',{op:'Vidange moteur et filtre à huile',tousJ:'',tousC:'250',lastD:dt(9,10),lastC:'1000'},{e:e.id});await S('fgam',{op:'Nettoyage du filtre à air',tousJ:'90',tousC:'',lastD:dt(8,1),lastC:''},{e:e.id});
+   for(const [m,d,c,l] of [[9,1,1100,'200'],[10,1,1160,'250'],[11,1,1240,'340']])await saveMop(FK('fmop',{k:'F',e:e.id}),{date:dt(m,d),cpt:String(c),litres:l,prixL:'3000',lib:'Station Engen',pay:'5712'});
+   await saveMop(FK('fmop',{k:'C',e:e.id}),{date:dt(10,12),cpt:'1180',lib:'Remplacement du régulateur de tension',pieces:'380000',mo:'60000',immo:'2',pay:'5712'})}
+  {const e=await eq({nom:'Pick-up Toyota Hilux (fictif)',type:'Véhicule',unite:'km',cpt:'85400',norme:'11',act:A.fg,ref:'0000 AB 00'});
+   await S('fgam',{op:'Vidange et filtres',tousJ:'180',tousC:'7500',lastD:dt(7,15),lastC:'80000'},{e:e.id});
+   for(const [m,d,c,l] of [[10,5,83200,'70'],[10,25,84300,'125'],[11,15,85400,'128']])await saveMop(FK('fmop',{k:'F',e:e.id}),{date:dt(m,d),cpt:String(c),litres:l,prixL:'3000',lib:'',pay:'5712'})}
+  {const ex=[['Jean Mutombo','2019-03-01',2],['Mireille Kasongo','2023-06-15',0],['Patrick Ngoy','2021-01-10',3]];for(const [n,d,r] of ex){const e=JSON.parse(JSON.stringify(live(D.emps).find(x=>x.nom===n)));e.emb=d;e.cgReport=r;await commit('emps',e,'embauche',n)}}
+  const E=n=>live(D.emps).find(x=>x.nom===n).id;
+  await saveCg({emp:E('Jean Mutombo'),type:'Congé annuel',du:dt(9,7),au:dt(9,12),note:'Congé de fin de saison'});
+  {const c={id:uid(),emp:E('Mireille Kasongo'),type:'Congé annuel',du:addDays(T,10),au:addDays(T,16),jours:joursOuvrables(addDays(T,10),addDays(T,16)),statut:'Demandé',apb:'',note:'Voyage familial'};await commit('conges',c,'demande de congé','Mireille')}
+  for(const k of [3,2,1,0]){const d=addDays(T,-k);if(!isOuvrable(d))continue;const F={};for(const e of live(D.emps)){F['s_'+e.id]=e.nom.startsWith('Patrick')&&k===1?'Retard':e.nom.startsWith('Mireille')&&k===2?'Absent justifié':'Présent';F['a_'+e.id]=e.nom.startsWith('Patrick')&&k===1?'08:40':'07:55';F['d_'+e.id]='17:00'}await savePres(FK('fpres',{d}),F)}
+  await savePret({emp:E('Patrick Ngoy'),mt:'300000',nb:'6',date:dt(10,15),tr:'5712',motif:'Frais médicaux'});
   UI.lastAct=A.fg;
 }
 const DEMO_TOUR=[
   ['accueil','Accueil','Résultat de l\'année, trésorerie, alertes et cartes de chaque activité.'],
-  ['direction','Direction','Tableau de bord interactif (touchez un mois ou une activité), budgets, objectifs et rapport PDF du mois.'],
+  ['direction','Direction','Tableau de bord interactif, trésorerie prévue sur 12 mois, budgets, objectifs et rapport PDF du mois.'],
   ['activites','Ferme maraîchère','Gombo en récolte : coûts, récoltes, ventes et rendement ; aubergine africaine en culture.','ferme'],
   ['activites','Poulets de chair','Bande de mars terminée (marge, indice de conversion), bande d\'octobre en cours avec courbe de croissance.','poulets'],
   ['activites','Pisciculture','Lot de tilapias depuis juin : survie, biomasse, pêches de contrôle, récolte partielle.','pisci'],
-  ['activites','Électricité & solaire','Cinq chantiers à des étapes différentes : prospect, devis envoyé, en cours, facturé, clôturé. Ouvrez « Solaire 10 kWc » pour sa rentabilité.','elec'],
+  ['activites','Électricité & solaire','Chantiers à toutes les étapes, dont un marché public avec situations de travaux, avance, retenue de garantie et sous-traitant, et une affaire perdue. Ouvrez « Solaire 10 kWc » pour sa rentabilité.','elec'],
   ['activites','Couture & peinture','Commandes à l\'atelier (une en retard), mesures, acomptes ; chantier de peinture avec calcul des litres.','couture'],
   ['projets','Projets','Extension du poulailler : tâches enchaînées sur le Gantt, une tâche en cours, un jalon.'],
-  ['factures','Factures','Devis convertis, factures payées en partie, reste à encaisser.'],
+  ['factures','Factures et créances','Balance âgée, plafond de crédit dépassé, relance avec promesse de paiement.'],
   ['achats','Achats','Un circuit complet (demande → approbation → bon de commande → réception → facture), une commande à réceptionner, une demande à approuver.'],
-  ['paie','Paie','Trois employés, IPR calculé avec le barème, bulletins payés et bulletins de novembre en brouillon.'],
-  ['etats','États financiers','Bilan, compte de résultat, flux de trésorerie, notes annexes, immobilisations amorties.']];
+  ['paie','Paie et personnel','Bulletins avec IPR au barème, congés (soldes, demande à décider), pointage des présences, prêt remboursé sur salaire.'],
+  ['etats','États financiers','Bilan, compte de résultat, flux de trésorerie, notes annexes, immobilisations amorties.'],
+  ['materiel','Matériel','Groupe électrogène et pick-up : entretiens en retard ou à venir, consommation de carburant comparée à la norme.'],
+  ['stocks','Stocks et dépôts','Trois dépôts avec transferts, inventaire physique validé avec un écart justifié.']];
 function demoTour(){return `<div class="card" style="background:var(--y);color:var(--yi);border:0"><b style="font-size:17px">Visite guidée de la démonstration</b><p class="small" style="margin:4px 0 10px">Toutes les données sont fictives. Touchez une rubrique pour voir son exemple. Vous pouvez tout modifier : la démo n'a aucun effet sur votre vraie société.</p>
   ${DEMO_TOUR.map(([v,l,d,a])=>`<div data-go="${v}"${a?` data-sub3="${a}"`:''} style="cursor:pointer;padding:8px 0;border-top:1px solid rgba(16,20,24,.2)"><b>${l} →</b><div class="small">${d}</div></div>`).join('')}
   <div class="btns" style="margin:10px 0 0"><button data-act="demoExit" style="background:var(--yi);color:#fff">Revenir à ma société</button><button class="ghost" data-act="demoReset" style="color:var(--yi);border-color:var(--yi)">Recommencer la démo</button></div></div>`}
 
+/* ============ ÉTAPE 7 : RÈGLES MÉTIER AVANCÉES ============ */
+const FERIES_RDC='01-01 Nouvel an;01-04 Martyrs de l\'indépendance;01-16 Héros national L.-D. Kabila;01-17 Héros national P. E. Lumumba;04-06 Combat de Simon Kimbangu et conscience africaine;05-01 Fête du travail;05-17 Révolution et Forces armées;06-30 Indépendance;08-01 Fête des parents;08-02 Génocide congolais (Genocost);12-25 Noël';
+function feries(){return (D.settings.feries||FERIES_RDC).split(';').map(x=>x.trim()).filter(Boolean).map(x=>[x.slice(0,5),x.slice(6)])}
+function isOuvrable(d){const w=new Date(d+'T12:00:00').getDay();return w!==0&&!feries().some(f=>f[0]===d.slice(5))}
+function joursOuvrables(a,b){let n=0;for(let d=a;d<=b&&n<400;d=addDays(d,1))if(isOuvrable(d))n++;return n}
+function ensureAccs(){return Promise.all([['4117','Clients, retenues de garantie'],['4191','Clients, avances et acomptes reçus'],['621','Sous-traitance générale'],['624','Entretien, réparations et maintenance']].map(([c,l])=>ensureAcc(c,l)))}
+/* ---------- 1. Situations de travaux (chantiers) ---------- */
+function dqeTot(p){return r2((p.dqe||[]).reduce((s,x)=>s+(+x.q||0)*(+x.pu||0),0))}
+function avRecu(p){return r2(posted().filter(e=>e.src&&e.src.type==='avance'&&e.src.ref===p.id).reduce((s,e)=>s+e.lines.filter(l=>l.c==='4191').reduce((a,l)=>a+(+l.k||0)-(+l.d||0),0),0))}
+function sits(p){return live(D.docs).filter(d=>d.proj===p.id&&d.sit&&d.type==='F').sort((a,b)=>a.sit.n-b.sit.n)}
+function sitPrev(p){const ss=sits(p).filter(d=>d.st==='E'),last=ss.at(-1);return {n:ss.length,cum:last?last.sit.cum:{},cumHT:last?+last.sit.cumHT:0,remb:r2(ss.reduce((s,d)=>s+(+d.sit.remb||0),0)),rg:r2(ss.reduce((s,d)=>s+(+d.sit.rg||0),0)),au:last?last.sit.au:''}}
+function sitBlock(p){const can=perm('chantiers')||perm('projets')||(isPeint(p)&&perm('atelier')),m=dqeTot(p),pv=sitPrev(p),av=avRecu(p),lib=p.rgLib;
+  return `<h3>Marché et situations de travaux</h3>
+  ${m?`<div class="kpis"><div class="kpi"><div class="l">Marché (DQE) HT</div><div class="v">${money(m)}</div></div><div class="kpi"><div class="l">Avancement financier</div><div class="v">${Math.round(pv.cumHT/m*100)} %</div><div class="prog" style="margin-top:6px"><i style="width:${Math.min(100,pv.cumHT/m*100)}%"></i></div></div>
+  <div class="kpi"><div class="l">Avance de démarrage reçue</div><div class="v">${money(av)}</div><div class="small muted">remboursée ${money(pv.remb)}</div></div><div class="kpi"><div class="l">Retenue de garantie (${fmt(p.rgPct??5)} %)</div><div class="v">${money(pv.rg)}</div><div class="small muted">${lib?'libérée le '+dfr(lib.date):'à libérer à la réception'}</div></div></div>`:'<p class="small muted">Pour facturer par situations (marchés, gros chantiers) : saisissez les postes du marché (devis quantitatif et estimatif), puis une situation à chaque étape. L\'app calcule la période, rembourse l\'avance de démarrage au prorata et retient la garantie.</p>'}
+  ${can?`<div class="btns"><button data-act="dqeForm" data-id="${esc(p.id)}">${m?'Modifier les postes du marché':'+ Postes du marché (DQE)'}</button>${m?`<button data-act="avForm" data-id="${esc(p.id)}">+ Avance de démarrage reçue</button><button class="pr" data-act="sitForm" data-id="${esc(p.id)}">+ Situation n° ${pv.n+1}</button>`:''}${pv.rg>0&&!lib&&['Réceptionné','Facturé','Clôturé'].includes(p.statut)&&isAdmin()?`<button data-act="rgLib" data-id="${esc(p.id)}">Libérer la retenue de garantie</button>`:''}</div>`:''}
+  ${sits(p).length?`<div class="scroll"><table><thead><tr><th>Situation</th><th class="n">Cumul HT</th><th class="n">Période HT</th><th class="n">Retenue</th><th class="n">Avance remb.</th><th class="n">Net à payer</th></tr></thead><tbody>${sits(p).map(d=>{const t=docTot(d);return `<tr data-act="openDoc" data-id="${esc(d.id)}" style="cursor:pointer"><td>N° ${d.sit.n} · ${dfr(d.date)}<br><span class="small muted">${esc(d.num||'brouillon')} · ${esc(docStatus(d)[1])}</span></td><td class="n">${fmt(d.sit.cumHT)}</td><td class="n">${fmt(t.ht)}</td><td class="n">${fmt(d.sit.rg)}</td><td class="n">${fmt(d.sit.remb)}</td><td class="n"><b>${fmt(t.net)}</b></td></tr>`}).join('')}</tbody></table></div>`:''}`}
+function dqeRow(x={}){return `<tr><td><input name="des" value="${esc(x.des||'')}" maxlength="150" style="min-width:160px"><input type="hidden" name="pid" value="${esc(x.id||'')}"></td><td><input name="u" value="${esc(x.u||'u')}" maxlength="10" style="width:52px"></td><td><input type="number" name="q" step="any" min="0" value="${esc(x.q||'')}" style="width:70px"></td><td><input type="number" name="pu" step="0.01" min="0" value="${esc(x.pu||'')}" style="width:110px"></td></tr>`}
+function dqeForm(pid){const p=byId('projects',pid),used=sitPrev(p).n>0;
+  openSheet(`<h2>Postes du marché</h2><p class="small muted">${esc(p.nom)} · devis quantitatif et estimatif, en ${BASE()} HT${used?'. Des situations existent : ne supprimez pas un poste déjà facturé.':''}</p><form id="fdqe" data-p="${esc(pid)}">
+  <div class="scroll"><table><thead><tr><th>Désignation du poste</th><th>Unité</th><th>Quantité</th><th>Prix unitaire</th></tr></thead><tbody id="dqel">${[...(p.dqe||[]),{},{}].map(dqeRow).join('')}</tbody></table></div>
+  <div class="btns"><button type="button" class="ghost" data-act="dqeLine">+ Poste</button></div>
+  <div class="row2"><label class="f">Avance de démarrage (% du marché)<input type="number" name="avPct" step="0.1" min="0" max="50" value="${esc(p.avPct??0)}"></label><label class="f">Retenue de garantie (%)<input type="number" name="rgPct" step="0.1" min="0" max="20" value="${esc(p.rgPct??5)}"></label></div>
+  <p class="small muted">L'avance est remboursée par retenue sur chaque situation, au prorata de l'avancement. La retenue de garantie est libérée à la réception des travaux.</p>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveDqe(f,F){const p=JSON.parse(JSON.stringify(byId('projects',f.dataset.p)));
+  p.dqe=$$('#dqel tr').map(tr=>({id:tr.querySelector('[name=pid]').value||uid(),des:tr.querySelector('[name=des]').value.trim().slice(0,150),u:tr.querySelector('[name=u]').value.trim().slice(0,10),q:+tr.querySelector('[name=q]').value||0,pu:r2(+tr.querySelector('[name=pu]').value||0)})).filter(x=>x.des&&x.q>0);
+  p.avPct=Math.max(0,Math.min(50,+F.avPct||0));p.rgPct=Math.max(0,Math.min(20,+F.rgPct||0));const m=dqeTot(p);if(m>0)p.montant=m;
+  await commit('projects',p,'postes du marché',p.nom+' '+money(m));closeSheet();render();toast('Postes du marché enregistrés')}
+function avForm(pid){const p=byId('projects',pid),m=dqeTot(p)||+p.montant||0;
+  openSheet(`<h2>Avance de démarrage reçue</h2><p class="small muted">${esc(p.nom)} · ${esc(tiersNom(p.client))}</p><form id="fav" data-p="${esc(pid)}">
+  <div class="row2"><label class="f">Montant reçu (${BASE()})<input type="number" name="mt" step="0.01" min="0.01" value="${r2(m*(+p.avPct||0)/100)||''}" required></label><label class="f">Date<input type="date" name="date" value="${today()}" required></label></div>
+  <label class="f">Reçu sur<select name="tr">${TRESO.filter(t=>t[2]===BASE()).map(([c,l])=>`<option value="${c}">${l}</option>`).join('')}</select></label>
+  <p class="small muted">Écriture : trésorerie au débit, 4191 « avances reçues des clients » au crédit. Ce n'est pas encore du chiffre d'affaires.</p>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveAv(f,F){await ensureAccs();const p=byId('projects',f.dataset.p),mt=r2(+F.mt||0),cur=TR(F.tr)[2];if(!(mt>0))throw new Error('Montant invalide');
+  const e={id:uid(),date:F.date,jr:TR(F.tr)[3],piece:'AV-'+p.id.slice(-4),lib:('Avance de démarrage — '+p.nom).slice(0,200),act:p.act,proj:p.id,lines:[{c:F.tr,d:mt,k:0,t:'',fx:{cur,a:mt}},{c:'4191',d:0,k:mt,t:p.client}],src:{type:'avance',ref:p.id},st:isAdmin()?'V':'B'};
+  await commit('entries',e,'avance de démarrage',e.lib);closeSheet();render();toast('Avance enregistrée')}
+function sitForm(pid){const p=byId('projects',pid),pv=sitPrev(p);
+  openSheet(`<h2>Situation n° ${pv.n+1}</h2><p class="small muted">${esc(p.nom)} · saisissez la quantité <b>cumulée</b> réalisée à ce jour pour chaque poste.</p><form id="fsit" data-p="${esc(pid)}">
+  <div class="row2"><label class="f">Travaux du<input type="date" name="du" value="${esc(pv.au?addDays(pv.au,1):p.debut)}" required></label><label class="f">au<input type="date" name="au" value="${today()}" required></label></div>
+  <div class="scroll"><table><thead><tr><th>Poste</th><th class="n">Marché</th><th class="n">Cumul précédent</th><th>Nouveau cumul</th></tr></thead><tbody>${p.dqe.map(x=>`<tr><td>${esc(x.des)}<br><span class="small muted">${fmt(x.pu)} / ${esc(x.u)}</span></td><td class="n">${fmtQ(x.q)} ${esc(x.u)}</td><td class="n">${fmtQ(pv.cum[x.id]||0)}</td><td><input type="number" name="c_${esc(x.id)}" step="any" min="${esc(pv.cum[x.id]||0)}" max="${esc(x.q*1.2)}" value="${esc(pv.cum[x.id]||0)}" style="width:90px"></td></tr>`).join('')}</tbody></table></div>
+  <p class="small muted">Retenue de garantie ${fmt(p.rgPct??5)} % · avance remboursée au prorata de l'avancement. La situation devient une facture rattachée au chantier.</p>
+  <div class="btns"><button class="pr" type="submit">Établir la situation</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveSit(f,F){await ensureAccs();const p=byId('projects',f.dataset.p),pv=sitPrev(p),m=dqeTot(p);if(F.au<F.du)throw new Error('Période incohérente');
+  if(sits(p).some(d=>d.st==='B'))throw new Error('Une situation en brouillon existe déjà : émettez-la ou supprimez-la');
+  const cum={},lignes=[];for(const x of p.dqe){const c=Math.max(+pv.cum[x.id]||0,+F['c_'+x.id]||0);if(c>x.q*1.2)throw new Error('« '+x.des+' » dépasse de plus de 20 % la quantité du marché');cum[x.id]=c;const qp=r2(c-(+pv.cum[x.id]||0));if(qp>0)lignes.push({des:`${x.des} — situation n° ${pv.n+1} (cumul ${fmtQ(c)}/${fmtQ(x.q)} ${x.u})`,q:qp,pu:x.pu})}
+  if(!lignes.length)throw new Error('Aucun avancement sur la période');
+  const ht=r2(lignes.reduce((s,l)=>s+l.q*l.pu,0)),cumHT=r2(pv.cumHT+ht),av=avRecu(p),rembCum=m?Math.min(av,r2(av*cumHT/m)):0,remb=r2(Math.max(0,rembCum-pv.remb)),rg=r2(ht*(+(p.rgPct??5))/100);
+  const d={id:uid(),type:'F',num:'',st:'B',date:F.au,ech:addDays(F.au,30),client:p.client,proj:p.id,act:p.act,acc:'706',tva:D.settings.tvaDefaut,tvaRate:D.settings.tva,cur:BASE(),rate:RATE(),lignes,notes:`Situation n° ${pv.n+1} — travaux du ${dfr(F.du)} au ${dfr(F.au)}. Avancement cumulé : ${Math.round(cumHT/m*100)} % du marché.`,sit:{n:pv.n+1,du:F.du,au:F.au,cum,cumHT,prevHT:pv.cumHT,rg,rgPct:+(p.rgPct??5),remb}};
+  if(docTot(d).net<0)throw new Error('Le net de la situation serait négatif');
+  await commit('docs',d,'situation de travaux',p.nom+' n° '+d.sit.n);if(isAdmin())await issueDoc(d.id);closeSheet();render();docView(d.id);toast('Situation n° '+d.sit.n+' établie')}
+async function rgLibere(pid){const p=JSON.parse(JSON.stringify(byId('projects',pid))),rg=sitPrev(p).rg;if(!(rg>0)||p.rgLib)return;if(!ask('Libérer la retenue de garantie de '+money(rg)+' ? Une facture de libération sera émise au client.'))return;
+  const d={id:uid(),type:'F',num:'',st:'B',date:today(),ech:addDays(today(),30),client:p.client,proj:p.id,act:p.act,acc:'706',tva:false,tvaRate:0,cur:BASE(),rate:RATE(),lignes:[{des:'Libération de la retenue de garantie — '+p.nom,q:1,pu:rg}],notes:'Retenue de garantie libérée après réception des travaux.',rgRel:true};
+  await commit('docs',d,'libération retenue',p.nom);await issueDoc(d.id);p.rgLib={date:today(),mt:rg,doc:d.id};await commit('projects',p,'retenue libérée',p.nom);render();toast('Retenue de garantie libérée')}
+/* ---------- 2. Sous-traitants ---------- */
+function stcStats(c){const ops=live(D.stops).filter(o=>o.stc===c.id).sort((a,b)=>a.date.localeCompare(b.date)||a.upd-b.upd),ats=ops.filter(o=>o.type==='AT'),av=ats.length?+ats.at(-1).av:0,real=r2(+c.montant*av/100),rg=r2(real*(+c.rgPct||0)/100),paye=r2(ops.filter(o=>o.type==='PAY').reduce((s,o)=>s+(+o.mt||0),0));return {ops,av,real,rg,paye,du:r2(real-rg-paye)}}
+function stcBlock(p){const cs=live(D.stcs).filter(c=>c.proj===p.id),can=perm('chantiers')||perm('projets')||(isPeint(p)&&perm('atelier'));
+  return `<h3>Sous-traitants</h3>${can?`<div class="btns"><button data-act="stcForm" data-v="${esc(p.id)}">+ Contrat de sous-traitance</button></div>`:''}
+  ${cs.map(c=>{const s=stcStats(c);return `<div class="card"><div class="top"><span><b>${esc(tiersNom(c.tiers))}</b> · ${esc(c.objet)}</span><span class="amt">${money(c.montant)}</span></div>
+   <div class="small">Avancement constaté <b>${fmt(s.av)} %</b> · réalisé ${money(s.real)} · retenue ${fmt(c.rgPct)} % ${money(s.rg)} · payé ${money(s.paye)} · <b class="${s.du<0?'neg':''}">reste dû ${money(s.du)}</b></div>
+   <div class="prog" style="margin-top:6px"><i style="width:${Math.min(100,s.av)}%"></i></div>${s.du<0?'<p class="small neg">Payé au-delà du réalisé : attendez le prochain constat.</p>':''}
+   ${can?`<div class="btns" style="margin-top:8px"><button data-act="stop" data-k="AT" data-id="${esc(c.id)}">+ Constat d'avancement</button>${isAdmin()?`<button data-act="stop" data-k="PAY" data-id="${esc(c.id)}">+ Paiement</button>`:''}</div>`:''}
+   ${s.ops.length?`<div class="small muted" style="margin-top:6px">${s.ops.slice(-4).map(o=>dfr(o.date)+' : '+(o.type==='AT'?'constat '+fmt(o.av)+' %'+(o.lib?' ('+esc(o.lib)+')':''):'paiement '+money(o.mt))).join(' · ')}</div>`:''}</div>`}).join('')||'<p class="muted small">Aucun sous-traitant sur ce chantier.</p>'}`}
+function stcForm(pid){openSheet(`<h2>Contrat de sous-traitance</h2><form id="fstc" data-p="${esc(pid)}">
+  <label class="f">Sous-traitant<select name="tiers" data-tt="F" required>${optTiers('F')}</select></label>
+  <label class="f">Objet ou lot<input name="objet" required maxlength="120" placeholder="Pose des structures, peinture façade…"></label>
+  <div class="row2"><label class="f">Montant HT (${BASE()})<input type="number" name="montant" step="0.01" min="0.01" required></label><label class="f">Retenue de garantie (%)<input type="number" name="rgPct" step="0.1" min="0" max="20" value="5"></label></div>
+  <div class="row2"><label class="f">Début<input type="date" name="debut" value="${today()}" required></label><label class="f">Fin prévue<input type="date" name="fin" value="${addDays(today(),30)}" required></label></div>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveStc(f,F){if(!F.tiers||F.tiers==='__new')throw new Error('Choisissez le sous-traitant');const c={id:uid(),proj:f.dataset.p,tiers:F.tiers,objet:F.objet.slice(0,120),montant:r2(+F.montant||0),rgPct:Math.max(0,+F.rgPct||0),debut:F.debut,fin:F.fin,statut:'En cours'};
+  await commit('stcs',c,'contrat sous-traitance',tiersNom(c.tiers)+' '+money(c.montant));closeSheet();render()}
+function stopForm(k,cid){const c=byId('stcs',cid),s=stcStats(c);
+  openSheet(`<h2>${k==='AT'?'Constat d\'avancement':'Paiement du sous-traitant'}</h2><p class="small muted">${esc(tiersNom(c.tiers))} · ${esc(c.objet)} · avancement actuel ${fmt(s.av)} % · reste dû ${money(s.du)}</p><form id="fstop" data-k="${k}" data-c="${esc(cid)}">
+  <label class="f">Date<input type="date" name="date" value="${today()}" required></label>
+  ${k==='AT'?`<label class="f">Avancement cumulé constaté (%)<input type="number" name="av" step="1" min="${esc(s.av)}" max="100" value="${esc(s.av)}" required></label><label class="f">Réserves ou observations<input name="lib" maxlength="160"></label>`:`<div class="row2"><label class="f">Montant (${BASE()})<input type="number" name="mt" step="0.01" min="0.01" value="${Math.max(0,s.du)||''}" required></label><label class="f">Payé par<select name="tr">${TRESO.filter(t=>t[2]===BASE()).map(([cc,l])=>`<option value="${cc}">${l}</option>`).join('')}</select></label></div>`}
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveStop(f,F){const k=f.dataset.k,c=byId('stcs',f.dataset.c),p=byId('projects',c.proj),s=stcStats(c),o={id:uid(),stc:c.id,type:k,date:F.date,av:0,mt:0,lib:(F.lib||'').slice(0,160)};
+  if(k==='AT'){o.av=Math.max(0,Math.min(100,+F.av||0));if(o.av<s.av)throw new Error('L\'avancement cumulé ne peut pas baisser')}
+  else{await ensureAccs();o.mt=r2(+F.mt||0);if(!(o.mt>0))throw new Error('Montant invalide');if(o.mt>s.du+0.01&&!ask('Ce paiement dépasse le reste dû ('+money(s.du)+'). Continuer ?'))return;const cur=TR(F.tr)[2];
+    const e={id:uid(),date:o.date,jr:TR(F.tr)[3],piece:'ST',lib:('Sous-traitance '+tiersNom(c.tiers)+' — '+p.nom).slice(0,200),act:p.act,proj:p.id,lines:[{c:'621',d:o.mt,k:0,t:c.tiers},{c:F.tr,d:0,k:o.mt,t:'',fx:{cur,a:o.mt}}],src:{type:'soustraitance',ref:o.id},st:isAdmin()?'V':'B'};await commit('entries',e,'paiement sous-traitant',e.lib);o.entryId=e.id}
+  await commit('stops',o,k==='AT'?'constat sous-traitant':'paiement sous-traitant',tiersNom(c.tiers));closeSheet();render();toast('Enregistré')}
+/* ---------- 3. Créances : balance âgée, plafonds, relances ---------- */
+const RELT=['Appel téléphonique','SMS ou WhatsApp','Lettre de relance','Visite','Mise en demeure'],RELR=['Promesse de paiement','Pas de réponse','Conteste la facture','Refus','Payé'];
+function creances(){const t=today(),fs=live(D.docs).filter(d=>d.type==='F'&&d.st==='E'&&docDue(d)>0.005),B=['Non échu','1 à 30 j','31 à 60 j','61 à 90 j','Plus de 90 j'];
+  const bk=d=>{const r=d.ech?dd(d.ech,t):0;return r<=0?0:r<=30?1:r<=60?2:r<=90?3:4},by={};
+  for(const d of fs){const c=d.client,v=toBase(docDue(d),d.cur,d.rate);by[c]=by[c]||[0,0,0,0,0,0];by[c][bk(d)]+=v;by[c][5]+=v}
+  const tot=[0,0,0,0,0,0];for(const c in by)by[c].forEach((v,i)=>tot[i]+=v);
+  const rels=live(D.rels),prom=rels.filter(r=>r.res==='Promesse de paiement'&&r.dprom&&docDue(byId('docs',r.doc)||{lignes:[]})>0.005).sort((a,b)=>a.dprom.localeCompare(b.dprom));
+  return `<div class="kpis"><div class="kpi"><div class="l">Total à encaisser</div><div class="v">${money(tot[5])}</div></div><div class="kpi"><div class="l">Dont échu</div><div class="v ${tot[5]-tot[0]>0?'neg':''}">${money(tot[5]-tot[0])}</div></div><div class="kpi"><div class="l">Plus de 90 jours</div><div class="v ${tot[4]?'neg':''}">${money(tot[4])}</div></div><div class="kpi"><div class="l">Promesses en cours</div><div class="v">${prom.length}</div></div></div>
+  <h3>Balance âgée par client</h3>${Object.keys(by).length?`<div class="scroll"><table><thead><tr><th>Client</th>${B.map(x=>`<th class="n">${x}</th>`).join('')}<th class="n">Total</th><th class="n">Plafond</th></tr></thead><tbody>${Object.entries(by).sort((a,b)=>b[1][5]-a[1][5]).map(([c,v])=>{const pl=+(byId('tiers',c)||{}).plafond||0;return `<tr><td><b>${esc(tiersNom(c))}</b></td>${v.slice(0,5).map((x,i)=>`<td class="n ${i>=3&&x?'neg':''}">${x?fmt(x):''}</td>`).join('')}<td class="n"><b>${fmt(v[5])}</b></td><td class="n ${pl&&v[5]>pl?'neg':''}">${pl?fmt(pl):'—'}</td></tr>`}).join('')}<tr class="tot"><td>Total</td>${tot.slice(0,5).map(x=>`<td class="n">${fmt(x)}</td>`).join('')}<td class="n">${fmt(tot[5])}</td><td></td></tr></tbody></table></div>`:'<p class="muted">Aucune facture à encaisser.</p>'}
+  ${prom.length?`<h3>Promesses de paiement</h3>${prom.map(r=>{const d=byId('docs',r.doc);return `<div class="card" data-act="openDoc" data-id="${esc(r.doc)}" style="cursor:pointer"><div class="top"><span><b>${esc(tiersNom(d.client))}</b> · ${esc(d.num)}</span><span class="tag ${r.dprom<t?'r':'y'}">${r.dprom<t?'Promesse non tenue':'Promis le '+dfr(r.dprom)}</span></div><div class="small muted">${money(r.mprom||docDue(d),d.cur)} promis le ${dfr(r.date)}${r.note?' · '+esc(r.note):''}</div></div>`}).join('')}`:''}
+  <h3>Factures à relancer</h3>${fs.filter(d=>d.ech&&d.ech<t).sort((a,b)=>a.ech.localeCompare(b.ech)).map(d=>{const rs=rels.filter(r=>r.doc===d.id),last=rs.sort((a,b)=>b.date.localeCompare(a.date))[0];return `<div class="card"><div class="top"><span><b>${esc(tiersNom(d.client))}</b> · ${esc(d.num)} · échue depuis ${dd(d.ech,t)} j</span><span class="amt">${money(docDue(d),d.cur)}</span></div><div class="small muted">${rs.length} relance(s)${last?' · dernière le '+dfr(last.date)+' : '+esc(last.res):''}</div><div class="btns" style="margin-top:6px"><button data-act="relForm" data-id="${esc(d.id)}">Relancer</button><button class="ghost" data-act="openDoc" data-id="${esc(d.id)}">Voir la facture</button></div></div>`}).join('')||'<p class="muted">Aucune facture échue.</p>'}`}
+function relText(d){return `Bonjour ${tiersNom(d.client)},\nSauf erreur de notre part, la facture ${d.num} du ${dfr(d.date)}, échue le ${dfr(d.ech)}, reste due pour ${money(docDue(d),d.cur)}.\nMerci de bien vouloir procéder au règlement ou de nous indiquer la date prévue.\nCordialement,\n${D.settings.nom}${D.settings.tel?' — '+D.settings.tel:''}`}
+function relForm(docId){const d=byId('docs',docId);
+  openSheet(`<h2>Relance</h2><p class="small muted">${esc(tiersNom(d.client))} · ${esc(d.num)} · reste ${money(docDue(d),d.cur)}</p>
+  <div class="card" style="white-space:pre-wrap;font-size:14px">${esc(relText(d))}</div><div class="btns"><button type="button" data-act="relCopy" data-id="${esc(docId)}">Copier ou partager ce message</button></div>
+  <form id="frel" data-id="${esc(docId)}"><div class="row2"><label class="f">Date<input type="date" name="date" value="${today()}" required></label><label class="f">Moyen<select name="type">${RELT.map(x=>`<option>${x}</option>`).join('')}</select></label></div>
+  <label class="f">Résultat<select name="res">${RELR.map(x=>`<option>${x}</option>`).join('')}</select></label>
+  <div class="row2"><label class="f">Date promise<input type="date" name="dprom"></label><label class="f">Montant promis<input type="number" name="mprom" step="0.01" min="0"></label></div>
+  <label class="f">Note<input name="note" maxlength="200"></label>
+  <div class="btns"><button class="pr" type="submit">Enregistrer la relance</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveRel(f,F){const d=byId('docs',f.dataset.id),r={id:uid(),doc:d.id,client:d.client,date:F.date,type:F.type,res:F.res,dprom:F.dprom||'',mprom:r2(+F.mprom||0),note:(F.note||'').slice(0,200)};
+  await commit('rels',r,'relance client',tiersNom(d.client)+' '+d.num);closeSheet();render();toast('Relance enregistrée')}
+function clientEncours(c){return r2(live(D.docs).filter(d=>d.client===c&&d.type==='F'&&d.st==='E').reduce((s,d)=>s+toBase(Math.max(0,docDue(d)),d.cur,d.rate),0))}
+/* ---------- 4. Prévision de trésorerie sur 12 mois ---------- */
+function prevData(){const M0=today().slice(0,7),ms=monthsBetween(M0,addMonths(M0,11)),row=Object.fromEntries(ms.map(m=>[m,{e:0,s:0,d:[]}])),add=(m,k,v,l)=>{if(m<M0)m=M0;if(row[m]&&v){row[m][k]+=v;row[m].d.push([k,l,v])}};
+  for(const d of live(D.docs).filter(d=>d.type==='F'&&d.st==='E'&&docDue(d)>0.005))add((d.ech||d.date).slice(0,7),'e',toBase(docDue(d),d.cur,d.rate),'Facture '+d.num+' — '+tiersNom(d.client));
+  add(M0,'s',Math.max(0,solde(bTo(today()),['401'],'C')),'Dettes fournisseurs actuelles');
+  for(const p of live(D.pos).filter(p=>['Approuvée','Commandée','Reçue'].includes(p.statut)))add(addMonths((p.cdate||p.date).slice(0,7),1),'s',+p.total,'Commande '+(p.bc||p.num));
+  const emps=live(D.emps).filter(e=>e.actif!==false),S=D.settings,ms_=r2(emps.reduce((s,e)=>s+toBase(+e.base||0,e.cur),0)*(1+(+S.cnssPat+ +S.inpp+ +S.onem)/100));
+  if(!sub.pvb)for(const m of ms)add(m,'s',ms_,'Salaires et charges sociales (estimation)');
+  if(sub.pvb)for(const m of ms){const b=budPer([m]);if(m>M0||true){add(m,'e',b.p,'Budget des produits');add(m,'s',b.c,'Budget des charges')}}
+  for(const x of live(D.prevs))for(let i=0;i<Math.max(1,+x.rec||1);i++)add(addMonths(x.mois,i),x.sens==='E'?'e':'s',+x.mt,x.lib);
+  let sol=tresoTot(today());const t0=sol;const rows=ms.map(m=>{const r=row[m];sol=r2(sol+r.e-r.s);return {m,e:r2(r.e),s:r2(r.s),sol,d:r.d}});return {t0,rows}}
+function prevView(){const {t0,rows}=prevData(),seuil=+D.settings.seuilTreso||0,can=isAdmin(),mn=Math.min(t0,...rows.map(r=>r.sol)),mx=Math.max(t0,...rows.map(r=>r.sol),1);
+  const W2=420,H2=200,pl=44,X=i=>pl+i*(W2-pl-10)/Math.max(1,rows.length-1),Y=v=>12+(H2-34)*(1-(v-Math.min(0,mn))/(mx-Math.min(0,mn)||1));
+  const svg=`<svg viewBox="0 0 ${W2} ${H2}" style="width:100%;height:auto"><line x1="${pl}" x2="${W2-10}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--ln)"/>${seuil?`<line x1="${pl}" x2="${W2-10}" y1="${Y(seuil)}" y2="${Y(seuil)}" stroke="#e0a800" stroke-width="2" stroke-dasharray="5 4"/>`:''}<polyline fill="none" stroke="var(--ink)" stroke-width="2.5" points="${rows.map((r,i)=>X(i)+','+Y(r.sol)).join(' ')}"/>${rows.map((r,i)=>`<circle cx="${X(i)}" cy="${Y(r.sol)}" r="3.5" fill="${r.sol<seuil||r.sol<0?'var(--rd)':'var(--ink)'}"/><text x="${X(i)}" y="${H2-6}" font-size="11" text-anchor="middle" fill="var(--sl)">${MOIS[+r.m.slice(5)-1]}</text>`).join('')}<text x="${pl-6}" y="${Y(mx)+4}" font-size="11" text-anchor="end" fill="var(--sl)">${kf(mx)}</text><text x="${pl-6}" y="${Y(Math.min(0,mn))+4}" font-size="11" text-anchor="end" fill="var(--sl)">${kf(Math.min(0,mn))}</text></svg><div class="legend"><span><i style="background:var(--ink)"></i>Trésorerie prévue en fin de mois</span>${seuil?'<span><i style="background:#e0a800"></i>Seuil d\'alerte</span>':''}</div>`;
+  const low=rows.find(r=>r.sol<Math.max(0,seuil));
+  return `<p class="muted">Trésorerie actuelle <b>${money(t0)}</b>. Prévision construite à partir des factures à encaisser (à leur échéance), des dettes fournisseurs, des commandes engagées, ${sub.pvb?'du budget':'de la masse salariale'} et de vos prévisions manuelles.</p>
+  <div class="row2" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"><label class="f">Base de calcul<select data-subk="pvb"><option value="" ${!sub.pvb?'selected':''}>Engagements réels + salaires</option><option value="1" ${sub.pvb?'selected':''}>Budget de l'année</option></select></label>${can?'<div style="align-self:end"><button data-act="prevForm">+ Prévision manuelle</button></div>':''}</div>
+  ${low?`<div class="card" style="border-color:var(--rd)"><b class="neg">Attention : la trésorerie passerait à ${money(low.sol)} fin ${MOISL[+low.m.slice(5)-1]}${seuil?' (seuil '+money(seuil)+')':''}.</b> Anticipez : relancer les créances, étaler un achat, négocier un délai.</div>`:''}
+  ${svg}<div class="scroll"><table><thead><tr><th>Mois</th><th class="n">Entrées</th><th class="n">Sorties</th><th class="n">Solde fin de mois</th></tr></thead><tbody>${rows.map(r=>`<tr data-act="prevMois" data-v="${r.m}" style="cursor:pointer"><td>${MOISL[+r.m.slice(5)-1]} ${r.m.slice(0,4)}</td><td class="n">${fmt(r.e)}</td><td class="n">${fmt(r.s)}</td><td class="n ${r.sol<Math.max(0,seuil)?'neg':''}"><b>${fmt(r.sol)}</b></td></tr>`).join('')}</tbody></table></div>
+  <p class="small muted">Touchez un mois pour le détail. Seuil d'alerte réglable dans Réglages › Entreprise.</p>
+  ${live(D.prevs).length?`<h3>Prévisions manuelles</h3>${live(D.prevs).map(x=>`<div class="card"><div class="top"><span><b>${esc(x.lib)}</b> · à partir de ${MOISL[+x.mois.slice(5)-1]} ${x.mois.slice(0,4)}${+x.rec>1?' · '+x.rec+' mois':''}</span><span class="amt ${x.sens==='S'?'neg':''}">${x.sens==='S'?'−':'+'}${money(x.mt)}</span></div>${can?`<button class="dg" data-act="delPrev" data-id="${esc(x.id)}">Supprimer</button>`:''}</div>`).join('')}`:''}`}
+function prevForm(){openSheet(`<h2>Prévision manuelle</h2><form id="fprev"><div class="row2"><label class="f">Sens<select name="sens"><option value="E">Entrée d'argent</option><option value="S">Sortie d'argent</option></select></label><label class="f">À partir du mois<input type="month" name="mois" value="${today().slice(0,7)}" required></label></div>
+  <label class="f">Libellé<input name="lib" required maxlength="100" placeholder="Achat d'un véhicule, subvention, loyer annuel…"></label>
+  <div class="row2"><label class="f">Montant (${BASE()})<input type="number" name="mt" step="0.01" min="0.01" required></label><label class="f">Répéter pendant (mois)<input type="number" name="rec" step="1" min="1" max="12" value="1"></label></div>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+/* ---------- 5 et 6. Dépôts, transferts et inventaire physique ---------- */
+function depNom(id){return id?((byId('deps',id)||{}).nom||'Dépôt supprimé'):'Dépôt principal'}
+function depList(){return [{id:'',nom:'Dépôt principal'},...live(D.deps)]}
+function depQ(it,dep,end){return memo('dq'+it.id+'|'+(dep||'')+'|'+(end||''),()=>{const m={};let g=0;
+  for(const mv of live(D.moves).filter(x=>x.item===it.id&&x.st!=='X'&&(!end||x.date<=end)).sort((a,b)=>a.date.localeCompare(b.date)||a.upd-b.upd)){const n=+mv.q||0,d=mv.dep||'';
+    if(mv.type==='E'){m[d]=(m[d]||0)+n;g+=n}else if(mv.type==='S'){m[d]=(m[d]||0)-n;g-=n}else if(mv.type==='I'){m[d]=(m[d]||0)+(n-g);g=n}else if(mv.type==='T'){m[d]=(m[d]||0)-n;m[mv.dep2||'']=(m[mv.dep2||'']||0)+n}}
+  return Math.round((m[dep||'']||0)*1000)/1000})}
+function depSelect(name,val,label){return D.deps&&live(D.deps).length?`<label class="f">${label||'Dépôt'}<select name="${name}">${depList().map(d=>`<option value="${esc(d.id)}" ${d.id===(val||'')?'selected':''}>${esc(d.nom)}</option>`).join('')}</select></label>`:''}
+function depView(){const its=live(D.items).filter(i=>i.actif!==false).sort((a,b)=>a.nom.localeCompare(b.nom)),ds=depList(),can=perm('stocks');
+  return `<div class="btns">${can?'<button data-act="depForm">+ Dépôt</button>':''}${can&&ds.length>1&&its.length?'<button class="pr" data-act="trForm">Transférer entre dépôts</button>':''}</div>
+  ${ds.length<2?'<p class="muted">Créez un dépôt par lieu de stockage (ferme, atelier, magasin de chantier, boutique). Les entrées, sorties et inventaires se font alors par dépôt, et les transferts suivent le matériel d\'un lieu à l\'autre.</p>':''}
+  <div class="scroll"><table><thead><tr><th>Article</th>${ds.map(d=>`<th class="n">${esc(d.nom)}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>${its.map(i=>`<tr><td><b>${esc(i.nom)}</b><br><span class="small muted">${esc(i.unite)}</span></td>${ds.map(d=>{const q=depQ(i,d.id);return `<td class="n ${q<0?'neg':''}">${q?fmtQ(q):''}</td>`}).join('')}<td class="n"><b>${fmtQ(stockOf(i).q)}</b></td></tr>`).join('')}</tbody></table></div>
+  ${live(D.deps).length?`<h3>Dépôts</h3>${live(D.deps).map(d=>`<div class="card"><b>${esc(d.nom)}</b><div class="small muted">${esc(d.lieu||'')}${d.resp?' · responsable '+esc(userNom(d.resp)):''}</div></div>`).join('')}`:''}`}
+function depForm(){openSheet(`<h2>Nouveau dépôt</h2><form id="fdep"><label class="f">Nom<input name="nom" required maxlength="60" placeholder="Magasin de la ferme"></label><label class="f">Lieu<input name="lieu" maxlength="120"></label><label class="f">Responsable<select name="resp">${optUsers(ME)}</select></label>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+function trForm(){const its=live(D.items).filter(i=>i.actif!==false&&stockOf(i).q>0);
+  openSheet(`<h2>Transfert entre dépôts</h2><form id="ftr"><label class="f">Article<select name="item">${its.map(i=>`<option value="${esc(i.id)}">${esc(i.nom)}</option>`).join('')}</select></label>
+  <div class="row2">${depSelect('dep','','De')}${depSelect('dep2',live(D.deps)[0]?.id,'Vers')}</div>
+  <div class="row2"><label class="f">Quantité<input type="number" name="q" step="any" min="0" required></label><label class="f">Date<input type="date" name="date" value="${today()}" required></label></div>
+  <label class="f">Note (transporteur, bon…)<input name="motif" maxlength="120"></label>
+  <div class="btns"><button class="pr" type="submit">Transférer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+function invsView(){const vs=live(D.invs).sort((a,b)=>b.date.localeCompare(a.date)),can=perm('stocks');
+  return `<p class="muted">L'inventaire physique compare le stock compté au stock théorique de l'app, article par article. Les écarts sont justifiés puis passés en stock à la validation.</p>
+  ${can?`<div class="btns"><button class="pr" data-act="invNew">+ Nouvel inventaire</button></div>`:''}
+  ${vs.map(v=>{const s=invStats(v);return `<div class="card" data-act="invOpen" data-id="${esc(v.id)}" style="cursor:pointer"><div class="top"><span><b>${esc(v.num)}</b> · ${esc(depNom(v.dep))} · ${dfr(v.date)}</span><span class="tag ${v.statut==='Validé'?'g':'y'}">${esc(v.statut)}</span></div><div class="small muted">${s.compte}/${v.lignes.length} articles comptés · écart ${money(s.ev)}</div></div>`}).join('')||''}`}
+function invStats(v){let compte=0,ev=0,vt=0,vp=0;for(const l of v.lignes){const r=invRet(l);if(r!==null)compte++;const it=byId('items',l.item)||{},c=+l.cmup||0;vt+=l.theo*c;if(r!==null){vp+=r*c;ev+=(r-l.theo)*c}else vp+=l.theo*c}return {compte,ev:r2(ev),vt:r2(vt),vp:r2(vp)}}
+function invRet(l){return l.c2!==''&&l.c2!=null?+l.c2:l.c1!==''&&l.c1!=null?+l.c1:null}
+async function invNew(){const dep=live(D.deps).length?(window.prompt('Dépôt à inventorier ? Tapez son nom, ou laissez vide pour le dépôt principal.\n'+depList().map(d=>'• '+d.nom).join('\n'))||'').trim():'';const dd_=depList().find(d=>d.nom.toLowerCase()===dep.toLowerCase())||depList()[0];
+  const date=today(),its=live(D.items).filter(i=>i.actif!==false).sort((a,b)=>a.nom.localeCompare(b.nom));let n=live(D.invs).filter(v=>v.date.slice(0,4)===date.slice(0,4)).length+1;
+  const v={id:uid(),num:'INV-'+date.slice(0,4)+'-'+LOC.code+String(n).padStart(3,'0'),date,dep:dd_.id,statut:'Ouvert',lignes:its.map(i=>({item:i.id,theo:depQ(i,dd_.id,date),cmup:r2(stockOf(i,date).cmup),c1:'',c2:'',just:''}))};
+  await commit('invs',v,'ouverture inventaire',v.num);invView(v.id)}
+function invView(id){const v=byId('invs',id),s=invStats(v),open=v.statut==='Ouvert'&&perm('stocks');
+  openSheet(`<h2>${esc(v.num)} <span class="tag ${v.statut==='Validé'?'g':'y'}">${esc(v.statut)}</span></h2><p class="small muted">${esc(depNom(v.dep))} · stock théorique au ${dfr(v.date)} · valeur théorique ${money(s.vt)} · physique ${money(s.vp)} · <b class="${s.ev<0?'neg':''}">écart ${money(s.ev)}</b></p>
+  <form id="finv2" data-id="${esc(id)}"><div class="scroll"><table><thead><tr><th>Article</th><th class="n">Théorique</th><th>1er comptage</th><th>2e comptage</th><th class="n">Écart</th><th>Justification</th></tr></thead><tbody>${v.lignes.map((l,i)=>{const it=byId('items',l.item)||{},r=invRet(l),e=r===null?null:r2(r-l.theo);return `<tr><td>${esc(it.nom||'?')}<br><span class="small muted">${esc(it.unite||'')} · ${fmt(l.cmup)}</span></td><td class="n">${fmtQ(l.theo)}</td><td><input type="number" name="c1_${i}" step="any" min="0" value="${esc(l.c1)}" style="width:72px" ${open?'':'disabled'}></td><td><input type="number" name="c2_${i}" step="any" min="0" value="${esc(l.c2)}" style="width:72px" ${open?'':'disabled'}></td><td class="n ${e?'neg':''}">${e===null?'—':(e>0?'+':'')+fmtQ(e)}</td><td><input name="j_${i}" value="${esc(l.just)}" maxlength="80" style="min-width:110px" ${open?'':'disabled'} placeholder="${e?'casse, vol, erreur…':''}"></td></tr>`}).join('')}</tbody></table></div>
+  <p class="small muted">Le 2e comptage, s'il est saisi, remplace le 1er (contre-comptage des écarts). Les articles non comptés gardent leur stock théorique.</p>
+  <div class="btns">${open?'<button class="pr" type="submit">Enregistrer les comptages</button>':''}${open&&isAdmin()?`<button type="button" data-act="invValid" data-id="${esc(id)}">Valider et passer les écarts</button>`:''}<button type="button" class="ghost" data-act="invPrint" data-id="${esc(id)}">Procès-verbal (PDF)</button><button type="button" class="ghost" data-act="close">Fermer</button></div></form>`)}
+async function saveInv2(f,F){const v=JSON.parse(JSON.stringify(byId('invs',f.dataset.id)));v.lignes.forEach((l,i)=>{l.c1=F['c1_'+i]===''?'':String(Math.max(0,+F['c1_'+i]));l.c2=F['c2_'+i]===''?'':String(Math.max(0,+F['c2_'+i]));l.just=(F['j_'+i]||'').slice(0,80)});
+  await commit('invs',v,'comptage inventaire',v.num);invView(v.id);toast('Comptages enregistrés')}
+async function invValid(id){const v=JSON.parse(JSON.stringify(byId('invs',id)));const ec=v.lignes.filter(l=>{const r=invRet(l);return r!==null&&Math.abs(r-l.theo)>0.0005});
+  if(ec.some(l=>!l.just))return toast('Justifiez chaque écart avant de valider');if(!ask(ec.length+' écart(s) seront passés en stock. Valider l\'inventaire ?'))return;
+  for(const l of ec){const r=invRet(l),q=r2(Math.abs(r-l.theo));await commit('moves',{id:uid(),date:v.date,item:l.item,type:r>l.theo?'E':'S',q,pu:r>l.theo?l.cmup:0,motif:'Écart d\'inventaire '+v.num+' : '+l.just,dep:v.dep,inv:v.id,entryId:'',st:'V'},'écart inventaire',(byId('items',l.item)||{}).nom)}
+  v.statut='Validé';v.valid={date:today(),by:ME};await commit('invs',v,'validation inventaire',v.num);invView(id);render();toast('Inventaire validé')}
+function invHTML(v){const S=D.settings,s=invStats(v);return `<div class="doc rap"><div class="hd"><div><h1>${esc(S.nom)}</h1><div>${esc(S.adresse)}</div></div><div style="text-align:right"><h1>Procès-verbal d'inventaire</h1><div><b>${esc(v.num)}</b> · ${esc(depNom(v.dep))}</div><div>au ${dfr(v.date)} · ${esc(v.statut)}</div></div></div>
+  <table><thead><tr><th>Article</th><th style="text-align:right">Théorique</th><th style="text-align:right">Compté</th><th style="text-align:right">Écart</th><th style="text-align:right">Coût moyen</th><th style="text-align:right">Écart valeur</th><th>Justification</th></tr></thead><tbody>${v.lignes.map(l=>{const it=byId('items',l.item)||{},r=invRet(l),e=r===null?0:r2(r-l.theo);return `<tr><td>${esc(it.nom||'')}</td><td style="text-align:right">${fmtQ(l.theo)}</td><td style="text-align:right">${r===null?'non compté':fmtQ(r)}</td><td style="text-align:right">${e?fmtQ(e):''}</td><td style="text-align:right">${fmt(l.cmup)}</td><td style="text-align:right">${e?fmt(r2(e*l.cmup)):''}</td><td>${esc(l.just||'')}</td></tr>`}).join('')}</tbody></table>
+  <p>Valeur théorique ${money(s.vt)} · valeur physique ${money(s.vp)} · écart net <b>${money(s.ev)}</b>.</p><div style="display:flex;justify-content:space-between;margin-top:30px"><div class="sig">Le magasinier</div><div class="sig">Le contrôleur</div><div class="sig">Le gérant</div></div></div>`}
+/* ---------- 7. Matériel : maintenance préventive et carburant ---------- */
+const EQT=['Groupe électrogène','Motopompe','Véhicule','Moto','Machine à coudre','Outillage électrique','Autre'];
+function eqU(e){return e.unite==='km'?'km':e.unite==='h'?'h':''}
+function gStat(g,e){const t=today(),jr=+g.tousJ?dd(t,addDays(g.lastD||t,+g.tousJ)):null,cr=+g.tousC&&eqU(e)?r2((+g.lastC||0)+(+g.tousC)-(+e.cpt||0)):null;const late=(jr!==null&&jr<0)||(cr!==null&&cr<0),soon=!late&&((jr!==null&&jr<=7)||(cr!==null&&cr<=(+g.tousC)*0.1));return {jr,cr,late,soon,tag:late?['r','En retard']:soon?['y','Bientôt']:['g','À jour']}}
+function fuel(e){const fs=live(D.mops).filter(o=>o.eq===e.id&&o.type==='F'&&+o.cpt>0).sort((a,b)=>(+a.cpt)-(+b.cpt));let L=0,U=0;for(let i=1;i<fs.length;i++){const du=(+fs[i].cpt)-(+fs[i-1].cpt);if(du>0){L+=+fs[i].litres;U+=du}}const k=eqU(e)==='km'?100:1;return U>0?{c:r2(L/U*k),u:eqU(e)==='km'?'L/100 km':'L/h',ecart:+e.norme?r2((L/U*k-(+e.norme))/(+e.norme)*100):null}:null}
+function eqCost(e,from){return r2(live(D.mops).filter(o=>o.eq===e.id&&(!from||o.date>=from)).reduce((s,o)=>s+(+o.pieces||0)+(+o.mo||0)+(o.type==='F'?r2((+o.litres||0)*(+o.prixL||0)):0),0))}
+function materiel(){const es=live(D.equips).sort((a,b)=>a.nom.localeCompare(b.nom)),can=perm('materiel'),y0=EX()+'-01-01';
+  let late=0,soon=0;for(const e of es)for(const g of live(D.gammes).filter(g=>g.eq===e.id)){const s=gStat(g,e);if(s.late)late++;else if(s.soon)soon++}
+  return `<h2>Matériel et véhicules</h2><div class="kpis"><div class="kpi"><div class="l">Équipements</div><div class="v">${es.length}</div></div><div class="kpi"><div class="l">Entretiens en retard</div><div class="v ${late?'neg':''}">${late}</div></div><div class="kpi"><div class="l">À faire sous 7 jours</div><div class="v">${soon}</div></div><div class="kpi"><div class="l">Coût ${EX()} (entretien et carburant)</div><div class="v">${money(es.reduce((s,e)=>s+eqCost(e,y0),0))}</div></div></div>
+  ${can?'<div class="btns"><button class="pr" data-act="eqForm">+ Équipement</button></div>':''}
+  ${es.map(e=>{const gs=live(D.gammes).filter(g=>g.eq===e.id).map(g=>gStat(g,e)),fu=fuel(e),w=gs.some(s=>s.late)?['r','Entretien en retard']:gs.some(s=>s.soon)?['y','Entretien bientôt']:['g','À jour'];return `<div class="card" data-act="eqOpen" data-id="${esc(e.id)}" style="cursor:pointer"><div class="top"><b>${esc(e.nom)}</b><span class="tag ${w[0]}">${w[1]}</span></div><div class="small muted">${esc(e.type)}${eqU(e)?' · compteur '+fmtQ(e.cpt||0)+' '+eqU(e)+(e.cptDate?' le '+dfr(e.cptDate):''):''} · ${gs.length} gamme(s) d'entretien${fu?` · consommation ${fmt(fu.c)} ${fu.u}${fu.ecart!==null?` (<span class="${fu.ecart>15?'neg':''}">${fu.ecart>0?'+':''}${Math.round(fu.ecart)} % / norme</span>)`:''}`:''}</div></div>`}).join('')||'<p class="empty">Enregistrez vos équipements (groupe électrogène, motopompe, véhicules, machines à coudre) et leurs entretiens périodiques, par jours ou par heures de marche. L\'app prévient avant chaque échéance et suit la consommation de carburant par rapport à la norme du constructeur.</p>'}`}
+function eqForm(id){const e=id?byId('equips',id):{id:'',nom:'',type:'Groupe électrogène',unite:'h',cpt:0,norme:'',act:UI.lastAct||live(D.acts)[0]?.id,ref:''};
+  openSheet(`<h2>${id?'Modifier l\'équipement':'Nouvel équipement'}</h2><form id="feq" data-id="${esc(e.id)}"><div class="row2"><label class="f">Nom<input name="nom" value="${esc(e.nom)}" required maxlength="80" placeholder="Groupe 20 kVA"></label><label class="f">Type<select name="type">${EQT.map(x=>`<option ${x===e.type?'selected':''}>${x}</option>`).join('')}</select></label></div>
+  <div class="row2"><label class="f">Compteur<select name="unite">${[['h','Heures de marche'],['km','Kilomètres'],['','Aucun']].map(([v,l])=>`<option value="${v}" ${v===e.unite?'selected':''}>${l}</option>`).join('')}</select></label><label class="f">Valeur du compteur<input type="number" name="cpt" step="any" min="0" value="${esc(e.cpt||0)}"></label></div>
+  <div class="row2"><label class="f">Norme de consommation (L/h ou L/100 km)<input type="number" name="norme" step="0.1" min="0" value="${esc(e.norme||'')}"></label><label class="f">Activité<select name="act">${optActs(e.act)}</select></label></div>
+  <label class="f">Immatriculation ou n° de série<input name="ref" value="${esc(e.ref||'')}" maxlength="40"></label>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+function eqView(id){const e=byId('equips',id),can=perm('materiel'),gs=live(D.gammes).filter(g=>g.eq===id),ops=live(D.mops).filter(o=>o.eq===id).sort((a,b)=>b.date.localeCompare(a.date)),fu=fuel(e);
+  openSheet(`<h2>${esc(e.nom)}</h2><p class="small muted">${esc(e.type)}${e.ref?' · '+esc(e.ref):''}${eqU(e)?' · compteur '+fmtQ(e.cpt||0)+' '+eqU(e):''} · ${esc(actNom(e.act))}</p>
+  ${fu?`<p>Consommation moyenne <b>${fmt(fu.c)} ${fu.u}</b>${+e.norme?` pour une norme de ${fmt(e.norme)} : <b class="${fu.ecart>15?'neg':''}">${fu.ecart>0?'+':''}${Math.round(fu.ecart)} %</b>${fu.ecart>15?' — vérifiez fuites, réglages ou vols de carburant.':''}`:''}</p>`:''}
+  ${can?`<div class="btns"><button data-act="mop" data-k="R" data-id="${esc(id)}">Relevé du compteur</button><button data-act="mop" data-k="P" data-id="${esc(id)}">Entretien préventif</button><button data-act="mop" data-k="C" data-id="${esc(id)}">Réparation</button><button data-act="mop" data-k="F" data-id="${esc(id)}">Plein de carburant</button><button class="ghost" data-act="gamForm" data-id="${esc(id)}">+ Gamme d'entretien</button><button class="ghost" data-act="eqForm" data-id="${esc(id)}">Modifier</button></div>`:''}
+  <h3>Plan d'entretien</h3>${gs.length?`<div class="scroll"><table><thead><tr><th>Opération</th><th>Périodicité</th><th>Dernière fois</th><th>Prochaine échéance</th><th></th></tr></thead><tbody>${gs.map(g=>{const s=gStat(g,e);return `<tr><td>${esc(g.op)}</td><td>${[+g.tousJ?'tous les '+g.tousJ+' j':'',+g.tousC&&eqU(e)?'tous les '+fmtQ(g.tousC)+' '+eqU(e):''].filter(Boolean).join(' ou ')}</td><td>${g.lastD?dfr(g.lastD):'—'}${g.lastC?' · '+fmtQ(g.lastC)+' '+eqU(e):''}</td><td>${[s.jr!==null?(s.jr<0?(-s.jr)+' j de retard':'dans '+s.jr+' j'):'',s.cr!==null?(s.cr<0?fmtQ(-s.cr)+' '+eqU(e)+' de dépassement':'dans '+fmtQ(s.cr)+' '+eqU(e)):''].filter(Boolean).join(' · ')}</td><td><span class="tag ${s.tag[0]}">${s.tag[1]}</span></td></tr>`}).join('')}</tbody></table></div>`:'<p class="muted">Ajoutez les entretiens du constructeur (ex. vidange toutes les 250 h, filtre à air tous les 90 jours).</p>'}
+  <h3>Historique</h3>${ops.slice(0,30).map(o=>`<div class="card"><div class="top"><span><b>${{R:'Relevé',P:'Entretien préventif',C:'Réparation',F:'Carburant'}[o.type]}</b> · ${dfr(o.date)}</span><span class="amt">${o.type==='F'?money(r2(o.litres*o.prixL)):(+o.pieces||+o.mo)?money(r2((+o.pieces||0)+(+o.mo||0))):''}</span></div><div class="small muted">${o.cpt?fmtQ(o.cpt)+' '+eqU(e)+' · ':''}${o.type==='F'?fmt(o.litres)+' L à '+money(o.prixL)+'/L':''}${o.gamme?esc((byId('gammes',o.gamme)||{}).op||''):''}${o.lib?' '+esc(o.lib):''}${+o.immo?' · immobilisé '+o.immo+' j':''}</div></div>`).join('')||'<p class="muted">Rien pour l\'instant.</p>'}
+  <div class="btns"><button class="ghost" data-act="close">Fermer</button></div>`)}
+function gamForm(eid){const e=byId('equips',eid);openSheet(`<h2>Gamme d'entretien</h2><p class="small muted">${esc(e.nom)}</p><form id="fgam" data-e="${esc(eid)}"><label class="f">Opération<input name="op" required maxlength="100" placeholder="Vidange moteur et filtre à huile"></label>
+  <div class="row2"><label class="f">Tous les … jours<input type="number" name="tousJ" step="1" min="0"></label>${eqU(e)?`<label class="f">ou tous les … ${eqU(e)}<input type="number" name="tousC" step="any" min="0"></label>`:''}</div>
+  <div class="row2"><label class="f">Dernière réalisation<input type="date" name="lastD" value="${today()}"></label>${eqU(e)?`<label class="f">au compteur<input type="number" name="lastC" step="any" min="0" value="${esc(e.cpt||0)}"></label>`:''}</div>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+function mopForm(k,eid){const e=byId('equips',eid),gs=live(D.gammes).filter(g=>g.eq===eid);
+  openSheet(`<h2>${{R:'Relevé du compteur',P:'Entretien préventif',C:'Réparation',F:'Plein de carburant'}[k]}</h2><p class="small muted">${esc(e.nom)}</p><form id="fmop" data-k="${k}" data-e="${esc(eid)}">
+  <div class="row2"><label class="f">Date<input type="date" name="date" value="${today()}" required></label>${eqU(e)?`<label class="f">Compteur (${eqU(e)})<input type="number" name="cpt" step="any" min="0" value="${esc(e.cpt||'')}" ${k==='R'||k==='F'?'required':''}></label>`:''}</div>
+  ${k==='P'?`<label class="f">Gamme réalisée<select name="gamme">${gs.map(g=>`<option value="${esc(g.id)}">${esc(g.op)}</option>`).join('')}</select></label>`:''}
+  ${k==='C'||k==='P'?`<label class="f">Détail (panne, pièces, garage)<input name="lib" maxlength="160"></label><div class="row2"><label class="f">Pièces (${BASE()})<input type="number" name="pieces" step="0.01" min="0"></label><label class="f">Main-d'œuvre (${BASE()})<input type="number" name="mo" step="0.01" min="0"></label></div><label class="f">Jours d'immobilisation<input type="number" name="immo" step="0.5" min="0" value="0"></label>`:''}
+  ${k==='F'?`<div class="row2"><label class="f">Litres<input type="number" name="litres" step="0.1" min="0.1" required></label><label class="f">Prix du litre (${BASE()})<input type="number" name="prixL" step="0.01" min="0" required></label></div><label class="f">Station ou bon<input name="lib" maxlength="80"></label>`:''}
+  ${k!=='R'?`<label class="f">Enregistrer aussi en comptabilité<select name="pay"><option value="">Non</option>${TRESO.filter(t=>t[2]===BASE()).map(([c,l])=>`<option value="${c}">Oui — payé par ${l}</option>`).join('')}</select></label>`:''}
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveMop(f,F){const k=f.dataset.k,e=JSON.parse(JSON.stringify(byId('equips',f.dataset.e))),o={id:uid(),eq:e.id,type:k,date:F.date,cpt:+F.cpt||0,gamme:F.gamme||'',lib:(F.lib||'').slice(0,160),pieces:r2(+F.pieces||0),mo:r2(+F.mo||0),immo:+F.immo||0,litres:+F.litres||0,prixL:r2(+F.prixL||0)};
+  if(eqU(e)&&o.cpt&&o.cpt<(+e.cpt||0)&&F.date>=(e.cptDate||'')&&!ask('Le compteur saisi est inférieur au dernier relevé ('+fmtQ(e.cpt)+'). Continuer ?'))return;
+  const amt=k==='F'?r2(o.litres*o.prixL):r2(o.pieces+o.mo);
+  if(F.pay&&amt>0){await ensureAccs();const cur=TR(F.pay)[2],acc=k==='F'?'605':'624',ex={id:uid(),date:o.date,jr:TR(F.pay)[3],piece:'MAT',lib:((k==='F'?'Carburant ':'Entretien ')+e.nom+(o.lib?' — '+o.lib:'')).slice(0,200),act:e.act,lines:[{c:acc,d:amt,k:0,t:''},{c:F.pay,d:0,k:amt,t:'',fx:{cur,a:amt}}],src:{type:'materiel',ref:o.id},st:isAdmin()?'V':'B'};await commit('entries',ex,'saisie',ex.lib);o.entryId=ex.id}
+  await commit('mops',o,'matériel',e.nom);
+  if(o.cpt&&o.cpt>(+e.cpt||0)){e.cpt=o.cpt;e.cptDate=o.date;await commit('equips',e,'compteur',e.nom+' '+o.cpt)}
+  if(k==='P'&&o.gamme){const g=JSON.parse(JSON.stringify(byId('gammes',o.gamme)));g.lastD=o.date;if(o.cpt)g.lastC=o.cpt;await commit('gammes',g,'entretien réalisé',g.op)}
+  closeSheet();render();eqView(e.id);toast(k==='F'&&fuel(byId('equips',e.id))?.ecart>15?'Consommation au-dessus de la norme de plus de 15 %':'Enregistré')}
+/* ---------- 8. RH : congés, présences, prêts au personnel ---------- */
+const CGT=['Congé annuel','Congé de circonstance','Maladie','Maternité','Sans solde'],PRS=['Présent','Retard','Absent justifié','Absent non justifié','Congé','Mission'];
+function cgDroit(e,y){const S=D.settings,t=today(),deb=e.emb&&e.emb>y+'-01-01'?e.emb:y+'-01-01',fin=String(y)===t.slice(0,4)?t:y+'-12-31';if(fin<deb)return 0;
+  const mois=Math.max(0,Math.floor(dd(deb,fin)/30.4)),anc=e.emb?Math.floor(dd(e.emb,fin)/365.25):0;return r2(mois*(+(S.cgMois??1))+(+(S.cgAnc??1))*Math.floor(anc/5)*(mois/12))}
+function cgPris(e,y){return r2(live(D.conges).filter(c=>c.emp===e.id&&c.statut==='Approuvé'&&c.type==='Congé annuel'&&c.du.slice(0,4)===String(y)).reduce((s,c)=>s+(+c.jours||0),0))}
+function cgView(){const y=EX(),es=live(D.emps).filter(e=>e.actif!==false).sort((a,b)=>a.nom.localeCompare(b.nom)),cs=live(D.conges).sort((a,b)=>b.du.localeCompare(a.du)),t=today();
+  return `<div class="btns"><button class="pr" data-act="cgForm">+ Demande de congé</button></div>
+  <div class="scroll"><table><thead><tr><th>Employé</th><th class="n">Acquis ${y}</th><th class="n">Report</th><th class="n">Pris</th><th class="n">Solde</th><th>Absent aujourd'hui</th></tr></thead><tbody>${es.map(e=>{const a=cgDroit(e,y),p=cgPris(e,y),rp=+e.cgReport||0,ab=cs.find(c=>c.emp===e.id&&c.statut==='Approuvé'&&c.du<=t&&c.au>=t);return `<tr><td><b>${esc(e.nom)}</b><br><span class="small muted">${e.emb?'embauché le '+dfr(e.emb):'date d\'embauche à saisir'}</span></td><td class="n">${fmt(a)}</td><td class="n">${fmt(rp)}</td><td class="n">${fmt(p)}</td><td class="n"><b class="${a+rp-p<0?'neg':''}">${fmt(r2(a+rp-p))}</b></td><td>${ab?`<span class="tag y">${esc(ab.type)}</span>`:''}</td></tr>`}).join('')}</tbody></table></div>
+  <p class="small muted">Droit : ${fmt(D.settings.cgMois??1)} jour ouvrable par mois de service, plus ${fmt(D.settings.cgAnc??1)} jour par tranche de 5 ans d'ancienneté (réglable dans Réglages, à confirmer avec votre comptable). Jours comptés du lundi au samedi, hors jours fériés légaux.</p>
+  <h3>Demandes</h3>${cs.slice(0,40).map(c=>`<div class="card"><div class="top"><span><b>${esc((byId('emps',c.emp)||{}).nom||'')}</b> · ${esc(c.type)}</span><span class="tag ${c.statut==='Approuvé'?'g':c.statut==='Refusé'?'r':'y'}">${esc(c.statut)}</span></div><div class="small muted">Du ${dfr(c.du)} au ${dfr(c.au)} · ${fmt(c.jours)} jour(s) ouvrable(s)${c.note?' · '+esc(c.note):''}${c.apb?' · décidé par '+esc(userNom(c.apb)):''}</div>${c.statut==='Demandé'&&isAdmin()?`<div class="btns" style="margin-top:6px"><button class="pr" data-act="cgDec" data-v="Approuvé" data-id="${esc(c.id)}">Approuver</button><button class="dg" data-act="cgDec" data-v="Refusé" data-id="${esc(c.id)}">Refuser</button></div>`:''}</div>`).join('')||'<p class="muted">Aucune demande.</p>'}
+  <h3>Jours fériés légaux ${y}</h3><p class="small">${feries().map(f=>`${f[0].slice(3)}/${f[0].slice(0,2)} ${esc(f[1])}`).join(' · ')}</p>`}
+function cgForm(){const es=live(D.emps).filter(e=>e.actif!==false);openSheet(`<h2>Demande de congé ou d'absence</h2><form id="fcg"><label class="f">Employé<select name="emp">${es.map(e=>`<option value="${esc(e.id)}">${esc(e.nom)}</option>`).join('')}</select></label><label class="f">Type<select name="type">${CGT.map(x=>`<option>${x}</option>`).join('')}</select></label>
+  <div class="row2"><label class="f">Du<input type="date" name="du" value="${today()}" required></label><label class="f">Au (inclus)<input type="date" name="au" value="${addDays(today(),6)}" required></label></div><label class="f">Motif ou note<input name="note" maxlength="160"></label>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveCg(F){if(F.au<F.du)throw new Error('Dates incohérentes');const e=byId('emps',F.emp),j=joursOuvrables(F.du,F.au),c={id:uid(),emp:F.emp,type:F.type,du:F.du,au:F.au,jours:j,statut:isAdmin()?'Approuvé':'Demandé',apb:isAdmin()?ME:'',note:(F.note||'').slice(0,160)};
+  if(F.type==='Congé annuel'){const y=+F.du.slice(0,4),sol=cgDroit(e,y)+(+e.cgReport||0)-cgPris(e,y);if(j>sol&&!ask(`Le solde de ${e.nom} est de ${fmt(sol)} jour(s) pour ${j} demandés. Enregistrer quand même ?`))return}
+  if(live(D.conges).some(x=>x.emp===F.emp&&x.statut!=='Refusé'&&x.du<=F.au&&x.au>=F.du))throw new Error('Une absence existe déjà sur ces dates');
+  await commit('conges',c,'congé',e.nom+' '+j+' j');closeSheet();render();toast(c.statut==='Approuvé'?'Congé enregistré':'Demande enregistrée : en attente d\'approbation')}
+function presView(){const d=/^\d{4}-\d{2}-\d{2}$/.test(sub.pdate||'')?sub.pdate:today(),es=live(D.emps).filter(e=>e.actif!==false).sort((a,b)=>a.nom.localeCompare(b.nom)),mo=d.slice(0,7);
+  const pr=id=>byId('pres','pr_'+id+'_'+d),cg=e=>live(D.conges).find(c=>c.emp===e.id&&c.statut==='Approuvé'&&c.du<=d&&c.au>=d);
+  const ms=live(D.pres).filter(p=>p.date.slice(0,7)===mo);
+  return `<div class="row2" style="max-width:420px"><label class="f">Date du pointage<input type="date" data-subk="pdate" value="${d}"></label></div>${!isOuvrable(d)?'<p class="small muted">Dimanche ou jour férié.</p>':''}
+  <form id="fpres" data-d="${d}"><div class="scroll"><table><thead><tr><th>Employé</th><th>Statut</th><th>Arrivée</th><th>Départ</th></tr></thead><tbody>${es.map(e=>{const p=pr(e.id)||{},c=cg(e);return `<tr><td><b>${esc(e.nom)}</b></td><td><select name="s_${esc(e.id)}"><option value="">—</option>${PRS.map(x=>`<option ${x===(p.st||(c?'Congé':''))?'selected':''}>${x}</option>`).join('')}</select></td><td><input type="time" name="a_${esc(e.id)}" value="${esc(p.arr||'')}"></td><td><input type="time" name="d_${esc(e.id)}" value="${esc(p.dep||'')}"></td></tr>`}).join('')}</tbody></table></div>
+  <div class="btns"><button class="pr" type="submit">Enregistrer le pointage du ${dfr(d)}</button></div></form>
+  <h3>Synthèse de ${MOISL[+mo.slice(5)-1]}</h3><div class="scroll"><table><thead><tr><th>Employé</th><th class="n">Présent</th><th class="n">Retards</th><th class="n">Absences justifiées</th><th class="n">Non justifiées</th><th class="n">Heures</th></tr></thead><tbody>${es.map(e=>{const l=ms.filter(p=>p.emp===e.id),n=s=>l.filter(p=>p.st===s).length,h=r2(l.reduce((s,p)=>{if(!p.arr||!p.dep)return s;const [a1,a2]=p.arr.split(':').map(Number),[b1,b2]=p.dep.split(':').map(Number);return s+Math.max(0,(b1*60+b2-a1*60-a2-60)/60)},0));return `<tr><td>${esc(e.nom)}</td><td class="n">${n('Présent')+n('Retard')+n('Mission')}</td><td class="n ${n('Retard')>2?'neg':''}">${n('Retard')}</td><td class="n">${n('Absent justifié')+n('Congé')}</td><td class="n ${n('Absent non justifié')?'neg':''}">${n('Absent non justifié')}</td><td class="n">${fmt(h)}</td></tr>`}).join('')}</tbody></table></div><p class="small muted">Heures = départ − arrivée − 1 h de pause.</p>`}
+async function savePres(f,F){const d=f.dataset.d;let n=0;for(const e of live(D.emps).filter(e=>e.actif!==false)){const st=F['s_'+e.id];if(!st)continue;const id='pr_'+e.id+'_'+d,old=byId('pres',id),r=old?JSON.parse(JSON.stringify(old)):{id,emp:e.id,date:d};
+    if(old&&old.st===st&&(old.arr||'')===(F['a_'+e.id]||'')&&(old.dep||'')===(F['d_'+e.id]||''))continue;Object.assign(r,{st,arr:F['a_'+e.id]||'',dep:F['d_'+e.id]||''});await commit('pres',r,'pointage',e.nom+' '+st,{noAudit:true});n++}
+  render();toast(n+' pointage(s) enregistré(s)')}
+function pretStats(p){const rem=r2(live(D.slips).filter(s=>s.prets&&s.prets[p.id]).reduce((a,s)=>a+(+s.prets[p.id]||0),0));return {rem,reste:r2(+p.mt-rem)}}
+function pretsDue(emp){const map={};let total=0;for(const p of live(D.prets).filter(p=>p.emp===emp)){const s=pretStats(p);if(s.reste>0.005){const m=r2(Math.min(+p.mens,s.reste));map[p.id]=m;total+=m}}return {map,total:r2(total)}}
+function pretView(){const ps=live(D.prets).sort((a,b)=>b.date.localeCompare(a.date));
+  return `${isAdmin()?'<div class="btns"><button class="pr" data-act="pretForm">+ Avance ou prêt</button></div>':''}
+  ${ps.map(p=>{const s=pretStats(p),e=byId('emps',p.emp)||{};return `<div class="card"><div class="top"><span><b>${esc(e.nom||'')}</b> · ${esc(p.motif||'Prêt')}</span><span class="amt">${money(p.mt,e.cur)}</span></div><div class="small muted">Accordé le ${dfr(p.date)} · ${p.nb} mensualité(s) de ${money(p.mens,e.cur)} · remboursé ${money(s.rem,e.cur)} · <b>reste ${money(s.reste,e.cur)}</b></div><div class="prog" style="margin-top:6px"><i style="width:${Math.min(100,s.rem/(+p.mt||1)*100)}%"></i></div></div>`}).join('')||'<p class="muted">Aucune avance ni prêt. La mensualité est retenue automatiquement sur chaque nouveau bulletin, jusqu\'au remboursement complet.</p>'}`}
+function pretForm(){const es=live(D.emps).filter(e=>e.actif!==false);openSheet(`<h2>Avance ou prêt au personnel</h2><form id="fpret"><label class="f">Employé<select name="emp">${es.map(e=>`<option value="${esc(e.id)}">${esc(e.nom)} (${esc(e.cur)})</option>`).join('')}</select></label>
+  <div class="row2"><label class="f">Montant (devise du salaire)<input type="number" name="mt" step="0.01" min="0.01" required></label><label class="f">Nombre de mensualités<input type="number" name="nb" step="1" min="1" max="24" value="1" required></label></div>
+  <div class="row2"><label class="f">Date<input type="date" name="date" value="${today()}" required></label><label class="f">Versé par<select name="tr">${TRESO.map(([c,l])=>`<option value="${c}">${l}</option>`).join('')}</select></label></div><label class="f">Motif<input name="motif" maxlength="100" placeholder="Avance sur salaire, frais médicaux…"></label>
+  <p class="small muted">La retenue mensuelle ne devrait pas dépasser le tiers du salaire net.</p>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function savePret(F){const e=byId('emps',F.emp),mt=r2(+F.mt||0),nb=Math.max(1,Math.round(+F.nb||1)),cur=TR(F.tr)[2];if(cur!==e.cur)throw new Error('Choisissez une caisse dans la devise du salaire ('+e.cur+')');
+  const b=toBase(mt,cur),ex={id:uid(),date:F.date,jr:TR(F.tr)[3],piece:'PRET',lib:('Avance au personnel — '+e.nom).slice(0,200),act:e.act||'act5',lines:[{c:'421',d:b,k:0,t:''},{c:F.tr,d:0,k:b,t:'',fx:{cur,a:mt}}],src:{type:'pret',ref:e.id},st:isAdmin()?'V':'B'};
+  await commit('entries',ex,'avance au personnel',ex.lib);const p={id:uid(),emp:e.id,date:F.date,mt,nb,mens:r2(mt/nb),motif:(F.motif||'').slice(0,100),entryId:ex.id};
+  if(p.mens>slipCalc({base:e.base,primes:0,indem:0,ipr:0,avance:0,cur:e.cur,rate:RATE()}).net/3)toast('Attention : mensualité supérieure au tiers du salaire net');
+  await commit('prets',p,'prêt au personnel',e.nom+' '+mt);closeSheet();render()}
+/* ---------- 9 et 10. Pipeline pondéré, retard toléré ---------- */
+const CHPROB={'Prospect':10,'Devis envoyé':40,'Accepté':90,'En cours':100,'Réceptionné':100,'Facturé':100,'Clôturé':100,'Perdu':0};
+function taskExp(x,t=today()){if(t<x.debut)return 0;if(t>=x.fin)return 100;return Math.round(dd(x.debut,t)/(dd(x.debut,x.fin)+1)*100)}
+function taskLate(x,t=today()){const av=+x.av||0;if(av>=100)return false;return x.fin<t||av<taskExp(x,t)-(+(D.settings.tolRetard??15))}
+
 /* ============ PROJETS, TÂCHES ET GANTT ============ */
 const PSTAT=['Prévu','En cours','Suspendu','Terminé'];
-function projStats(p){const ts=live(D.tasks).filter(t=>t.projet===p.id),t=today();const av=ts.length?Math.round(ts.reduce((s,x)=>s+(+x.av||0),0)/ts.length):(p.statut==='Terminé'?100:0);return {ts,av,late:ts.filter(x=>x.fin<t&&(+x.av||0)<100).length}}
+function projStats(p){const ts=live(D.tasks).filter(t=>t.projet===p.id),t=today();const av=ts.length?Math.round(ts.reduce((s,x)=>s+(+x.av||0),0)/ts.length):(p.statut==='Terminé'?100:0);return {ts,av,late:ts.filter(x=>taskLate(x,t)).length}}
 const dd=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5);
 function gantt(items,zoom){
   if(!items.length)return '<p class="empty">Rien à afficher.</p>';
@@ -2268,8 +2602,8 @@ function projetView(){
   <div class="kpis"><div class="kpi"><div class="l">Avancement</div><div class="v">${s.av} %</div></div><div class="kpi"><div class="l">Tâches</div><div class="v">${ts.filter(x=>(+x.av||0)>=100).length} / ${ts.length}</div></div><div class="kpi"><div class="l">En retard</div><div class="v ${s.late?'neg':''}">${s.late}</div></div><div class="kpi"><div class="l">Jours restants</div><div class="v ${p.fin<t?'neg':''}">${Math.max(0,dd(t,p.fin))}</div></div>${+p.budget?`<div class="kpi"><div class="l">Budget</div><div class="v">${money(p.budget)}</div></div>`:''}</div>
   ${p.desc?`<p>${esc(p.desc).replace(/\n/g,'<br>')}</p>`:''}
   <div class="btns">${can?`<button class="pr" data-act="task" data-p="${esc(p.id)}">+ Tâche</button>${CH?'':`<button class="ghost" data-act="proj" data-id="${esc(p.id)}">Modifier le projet</button>`}`:''}</div>${CH?chantierBlock(p):''}
-  <h3>Diagramme de Gantt</h3>${zoomSeg()}${gantt(ts.map(x=>({id:x.id,label:x.nom,sub:userNom(x.resp)+(x.dep?' · après '+((byId('tasks',x.dep)||{}).nom||''):''),debut:x.debut,fin:x.fin,av:+x.av||0,ms:!!x.jalon,late:x.fin<t&&(+x.av||0)<100,act:'task'})),UI.gz||'S')}
-  <h3>Tâches</h3>${ts.length?`<table class="stack"><thead><tr><th>Tâche</th><th>Responsable</th><th>Dates</th><th class="n">Avancement</th></tr></thead><tbody>${ts.map(x=>`<tr data-act="task" data-id="${esc(x.id)}" style="cursor:pointer"><td><b>${esc(x.nom)}</b>${x.jalon?' <span class="tag y">Jalon</span>':''}</td><td>${esc(userNom(x.resp))}</td><td>${dfr(x.debut)} → ${dfr(x.fin)}</td><td class="n ${x.fin<t&&(+x.av||0)<100?'neg':''}">${+x.av||0} %</td></tr>`).join('')}</tbody></table>`:'<p class="muted">Ajoutez les tâches du projet.</p>'}`;
+  <h3>Diagramme de Gantt</h3>${zoomSeg()}${gantt(ts.map(x=>({id:x.id,label:x.nom,sub:userNom(x.resp)+(x.dep?' · après '+((byId('tasks',x.dep)||{}).nom||''):''),debut:x.debut,fin:x.fin,av:+x.av||0,ms:!!x.jalon,late:taskLate(x,t),act:'task'})),UI.gz||'S')}
+  <h3>Tâches</h3>${ts.length?`<table class="stack"><thead><tr><th>Tâche</th><th>Responsable</th><th>Dates</th><th class="n">Avancement</th></tr></thead><tbody>${ts.map(x=>`<tr data-act="task" data-id="${esc(x.id)}" style="cursor:pointer"><td><b>${esc(x.nom)}</b>${x.jalon?' <span class="tag y">Jalon</span>':''}</td><td>${esc(userNom(x.resp))}</td><td>${dfr(x.debut)} → ${dfr(x.fin)}</td><td class="n ${taskLate(x,t)?'neg':''}">${+x.av||0} %<br><span class="small muted">attendu ${taskExp(x,t)} %</span></td></tr>`).join('')}</tbody></table>`:'<p class="muted">Ajoutez les tâches du projet.</p>'}`;
 }
 const optUsers=sel=>live(D.users).filter(u=>u.actif!==false).map(u=>`<option value="${esc(u.id)}" ${u.id===sel?'selected':''}>${esc(u.nom)}</option>`).join('');
 function projForm(id){const p=id?byId('projects',id):{id:'',nom:'',act:UI.lastAct||'act0',resp:ME,debut:today(),fin:addDays(today(),30),statut:'Prévu',budget:0,client:'',desc:''};
@@ -2473,7 +2807,7 @@ document.addEventListener('click',ev=>{
     validate:async()=>{const e=JSON.parse(JSON.stringify(byId('entries',id)));e.st='V';await commit('entries',e,'validation',e.lib);render();if(byId('entries',id).st==='V')toast('Écriture validée')},
     validateAll:async()=>{const ds=live(D.entries).filter(e=>e.st==='B');if(!ask('Valider '+ds.length+' brouillon(s) ?'))return;let n=0;for(const x of ds){try{const e=JSON.parse(JSON.stringify(x));e.st='V';await commit('entries',e,'validation',e.lib);n++}catch(er){}}render();toast(n+' écriture(s) validée(s)')},
     reverse:async()=>{const w=window.prompt('Motif de la contrepassation (obligatoire)');if(!w||!w.trim())return;await reverse(id,w.trim());render();toast('Contrepassation enregistrée')},
-    doc:()=>docForm(k),openDoc:()=>docView(id),editDoc:()=>docForm(null,id),convDoc:()=>docForm('F',null,{fromDevis:id}),avoir:()=>docForm('A',null,{avoirOf:id}),
+    doc:()=>docForm(k),openDoc:()=>docView(id),editDoc:()=>docForm(null,id),convDoc:()=>docForm('F',null,{fromDevis:id}),avoir:()=>{const x=byId('docs',id);if(x.sit||x.rgRel)return toast('Une situation de travaux ne s\'annule pas par avoir : établissez une situation corrective');docForm('A',null,{avoirOf:id})},
     addDocLine:()=>$('#dl').insertAdjacentHTML('beforeend',docLine({des:'',q:1,pu:0})),
     issueDoc:async()=>{if(!ask('Émettre ce document ? Il deviendra définitif et sera comptabilisé.'))return;await issueDoc(id);render();docView(id);toast('Document émis et comptabilisé')},
     payDoc:()=>payForm(id),
@@ -2518,6 +2852,16 @@ document.addEventListener('click',ev=>{
     poInvoice:()=>poInvoiceForm(id),
     lotForm:()=>lotForm(id),openLot:()=>{sub.lid=id;go('lot')},piop:()=>piopForm(k,id||sub.lid),
     delPiop:async()=>{if(!ask('Supprimer cette opération ? Son écriture comptable éventuelle n\'est pas supprimée.'))return;const o=JSON.parse(JSON.stringify(byId('pisops',id)));o.del=true;await commit('pisops',o,'suppression',PIOPS[o.type]);render()},
+    dqeForm:()=>dqeForm(id),dqeLine:()=>$('#dqel').insertAdjacentHTML('beforeend',dqeRow()),avForm:()=>avForm(id),sitForm:()=>sitForm(id),rgLib:()=>rgLibere(id),
+    stcForm:()=>stcForm(b.dataset.v),stop:()=>stopForm(k,id),relForm:()=>relForm(id),
+    relCopy:async()=>{const tx=relText(byId('docs',id));try{if(navigator.share){await navigator.share({text:tx});return}}catch(e){}try{await navigator.clipboard.writeText(tx);toast('Message copié : collez-le dans WhatsApp ou SMS')}catch(e){toast('Copie impossible sur cet appareil')}},
+    prevForm:()=>prevForm(),delPrev:async()=>{if(!ask('Supprimer cette prévision ?'))return;const x=JSON.parse(JSON.stringify(byId('prevs',id)));x.del=true;await commit('prevs',x,'suppression prévision',x.lib);render()},
+    prevMois:()=>{const r=prevData().rows.find(r=>r.m===b.dataset.v);openSheet(`<h2>${MOISL[+r.m.slice(5)-1]} ${r.m.slice(0,4)}</h2><div class="bars">${r.d.map(([k2,l,v])=>`<div class="row" style="grid-template-columns:minmax(0,1fr) 130px"><div>${esc(l)}</div><div class="n ${k2==='s'?'neg':''}">${k2==='s'?'−':'+'}${money(v)}</div></div>`).join('')||'<p class="muted">Aucun mouvement prévu.</p>'}</div><p>Solde prévu en fin de mois : <b>${money(r.sol)}</b></p><div class="btns"><button class="ghost" data-act="close">Fermer</button></div>`)},
+    depForm:()=>depForm(),trForm:()=>trForm(),invNew:()=>invNew(),invOpen:()=>invView(id),invValid:()=>invValid(id),invPrint:()=>doPrint(invHTML(byId('invs',id))),
+    eqForm:()=>eqForm(id),eqOpen:()=>eqView(id),gamForm:()=>gamForm(id),mop:()=>mopForm(k,id),
+    cgForm:()=>cgForm(),cgDec:async()=>{const c=JSON.parse(JSON.stringify(byId('conges',id)));c.statut=b.dataset.v;c.apb=ME;await commit('conges',c,'décision congé',c.statut);render()},
+    pretForm:()=>pretForm(),
+    chLost:async()=>{const m=(window.prompt('Motif de la perte (prix trop élevé, concurrent, projet abandonné, délai…)')||'').trim();if(!m)return;const p=JSON.parse(JSON.stringify(byId('projects',id)));p.statut='Perdu';p.perdu=m.slice(0,120);await commit('projects',p,'affaire perdue',p.nom+' : '+m);render()},
     tdbM:()=>{sub.tp='m';sub.tm=b.dataset.v;render()},tdbA:()=>{sub.ta=sub.ta===b.dataset.v?'':b.dataset.v;render()},drill:()=>drill(b.dataset.v),
     budForm:()=>budForm(b.dataset.v),objForm:()=>objForm(id),
     budSplit:()=>{const p=+$('#bpt').value||0,c=+$('#bct').value||0;for(let i=0;i<12;i++){if(p)$('#fbud [name=p'+i+']').value=r2(p/12);if(c)$('#fbud [name=c'+i+']').value=r2(c/12)}},
@@ -2608,7 +2952,7 @@ async function submitForm(f,F){switch(f.id){
       await commit('entries',{id:uid(),date:F.date,jr,piece:(F.piece||'').slice(0,60),lib:F.lib.slice(0,200),act:F.act,lines,src:{type:'quick',k:f.dataset.k},st},st==='V'?'saisie validée':'brouillon',F.lib);
       UI.lastAct=F.act;UI.cur=F.cur;saveUI();closeSheet();render();toast(st==='V'?'Opération enregistrée':'Brouillon enregistré, en attente de validation');break}
     case 'fm':await saveManual(f,F);break;
-    case 'ft':{const id=f.dataset.id;const t=id?JSON.parse(JSON.stringify(byId('tiers',id))):{id:uid()};Object.assign(t,{type:F.type,nom:F.nom.slice(0,120),tel:F.tel,adresse:F.adresse,nif:F.nif});await commit('tiers',t,id?'modification tiers':'nouveau tiers',t.nom);closeSheet();render();break}
+    case 'ft':{const id=f.dataset.id;const t=id?JSON.parse(JSON.stringify(byId('tiers',id))):{id:uid()};Object.assign(t,{type:F.type,nom:F.nom.slice(0,120),tel:F.tel,adresse:F.adresse,nif:F.nif,plafond:Math.max(0,+F.plafond||0)});await commit('tiers',t,id?'modification tiers':'nouveau tiers',t.nom);closeSheet();render();break}
     case 'fd':{const d=docDraft,lg=dLines();if(!lg.length)throw new Error('Ajoutez au moins une ligne avec un montant');
       if(d.type==='A'){const s=byId('docs',d.of);d.lignes=lg;d.date=F.date;d.notes=F.notes;const max=r2(docTot(s).ttc-docAvoirs(s));if(docTot(d).ttc>max+0.005)throw new Error('Avoir supérieur au montant restant ('+fmt(max)+')');d.id=uid();await commit('docs',d,'brouillon avoir',s.num);await issueDoc(d.id);closeSheet();render();docView(s.id);toast('Avoir émis et comptabilisé');break}
       if(!F.client||F.client==='__new')throw new Error('Choisissez un client');
@@ -2619,15 +2963,16 @@ async function submitForm(f,F){switch(f.id){
     case 'fp':await recordPay(f.dataset.id,F);render();docView(f.dataset.id);toast('Encaissement enregistré');break;
     case 'fi':{const id=f.dataset.id;const i=id?JSON.parse(JSON.stringify(byId('items',id))):{id:uid(),actif:true};Object.assign(i,{nom:F.nom.slice(0,120),unite:(F.unite||'').slice(0,20),seuil:+F.seuil||0,act:F.act});if(F.cat)i.cat=F.cat;if(id)i.actif=!!F.actif;await commit('items',i,id?'modification article':'nouvel article',i.nom);closeSheet();render();break}
     case 'fmv':{const k=f.dataset.k,it=byId('items',F.item),q=+F.q;if(!it)throw new Error('Choisissez un article');if(!(q>0)&&k!=='I')throw new Error('Quantité invalide');
-      const m={id:uid(),date:F.date,item:F.item,type:k,q,pu:r2(F.pu),motif:F.motif||'',entryId:'',st:'V'};
+      const m={id:uid(),date:F.date,item:F.item,type:k,q,pu:r2(F.pu),motif:F.motif||'',dep:F.dep||'',entryId:'',st:'V'};
+      if(k==='S'&&live(D.deps).length&&depQ(it,m.dep,m.date)<q-0.0005)throw new Error('Stock insuffisant dans '+depNom(m.dep)+' ('+fmtQ(depQ(it,m.dep,m.date))+')');
       if(!stockOK(m.item,[...D.moves,m]))throw new Error('Le stock deviendrait négatif à une date');
       if(k==='E'&&F.pay){const ach=STK[it.cat].ach;if(!ach)throw new Error('Un produit fini n\'a pas d\'écriture d\'achat');if(F.pay==='401'&&(!F.tiers||F.tiers==='__new'))throw new Error('Choisissez le fournisseur');
         const mtB=r2(q*m.pu),line=F.pay==='401'?{c:'401',d:0,k:mtB,t:F.tiers}:{c:F.pay,d:0,k:mtB,t:'',fx:{cur:TR(F.pay)[2],a:fromBase(mtB,TR(F.pay)[2],+F.rate)}};
         const e={id:uid(),date:F.date,jr:F.pay==='401'?'AC':TR(F.pay)[3],piece:'',lib:'Achat '+fmtQ(q)+' '+it.unite+' '+it.nom,act:it.act,src:{type:'stock',ref:m.id},st:'V',lines:[{c:ach,d:mtB,k:0,t:''},line]};
         await commit('entries',e,'achat stock',e.lib);m.entryId=e.id}
       await commit('moves',m,'mouvement de stock',it.nom+' '+k+' '+q);closeSheet();render();toast('Mouvement enregistré');break}
-    case 'fe':{const id=f.dataset.id;const e=id?JSON.parse(JSON.stringify(byId('emps',id))):{id:uid()};Object.assign(e,{nom:F.nom.slice(0,120),poste:F.poste,tel:F.tel,base:r2(F.base),cur:F.cur,cnss:F.cnss,pac:Math.max(0,Math.round(+F.pac||0)),act:F.act,actif:!!F.actif});await commit('emps',e,id?'modification employé':'nouvel employé',e.nom);closeSheet();render();break}
-    case 'fs':{const id=f.dataset.id;const s=id?JSON.parse(JSON.stringify(byId('slips',id))):{id:uid(),st:'B'};const emp=byId('emps',F.emp);Object.assign(s,{mois:F.mois,emp:F.emp,cur:emp?.cur||'USD',rate:RATE(),base:r2(F.base),primes:r2(F.primes),indem:r2(F.indem),ipr:r2(F.ipr),iprAuto:!!F.iprAuto,avance:r2(F.avance)});await commit('slips',s,'bulletin brouillon',emp?.nom||'');sub.mois=s.mois;closeSheet();render();slipForm(s.id);toast('Brouillon enregistré : validez-le pour le comptabiliser');break}
+    case 'fe':{const id=f.dataset.id;const e=id?JSON.parse(JSON.stringify(byId('emps',id))):{id:uid()};Object.assign(e,{nom:F.nom.slice(0,120),poste:F.poste,tel:F.tel,base:r2(F.base),cur:F.cur,cnss:F.cnss,pac:Math.max(0,Math.round(+F.pac||0)),emb:F.emb||'',cgReport:Math.max(0,+F.cgReport||0),act:F.act,actif:!!F.actif});await commit('emps',e,id?'modification employé':'nouvel employé',e.nom);closeSheet();render();break}
+    case 'fs':{const id=f.dataset.id;const s=id?JSON.parse(JSON.stringify(byId('slips',id))):{id:uid(),st:'B'};const emp=byId('emps',F.emp);Object.assign(s,{mois:F.mois,emp:F.emp,cur:emp?.cur||'USD',rate:RATE(),base:r2(F.base),primes:r2(F.primes),indem:r2(F.indem),ipr:r2(F.ipr),iprAuto:!!F.iprAuto,avance:r2(F.avance)});if(!id){const pr=pretsDue(F.emp);if(pr.total&&!(+F.avance)){s.avance=pr.total;s.prets=pr.map;setTimeout(()=>toast('Remboursement de prêt retenu : '+money(pr.total,s.cur)),1200)}}await commit('slips',s,'bulletin brouillon',emp?.nom||'');sub.mois=s.mois;closeSheet();render();slipForm(s.id);toast('Brouillon enregistré : validez-le pour le comptabiliser');break}
     case 'fps':{const s=JSON.parse(JSON.stringify(byId('slips',f.dataset.id)));if(TR(F.tr)[2]!==s.cur)throw new Error('Devise du compte différente du salaire');const net=slipCalc(s).net,nB=toBase(net,s.cur,s.rate),emp=byId('emps',s.emp)||{};
       const e={id:uid(),date:F.date,jr:TR(F.tr)[3],piece:'PAIE-'+s.mois,lib:'Paiement salaire — '+emp.nom,act:emp.act||'act5',src:{type:'paiepay',ref:s.id},st:'V',lines:[{c:'422',d:nB,k:0,t:''},{c:F.tr,d:0,k:nB,t:'',fx:{cur:s.cur,a:net}}]};
       await commit('entries',e,'paiement salaire',emp.nom);s.st='P';s.paid=F.date;s.payEntry=e.id;await commit('slips',s,'salaire payé',emp.nom);closeSheet();render();toast('Salaire payé');break}
@@ -2648,17 +2993,33 @@ async function submitForm(f,F){switch(f.id){
     case 'fcmd':await saveCmd(f,F);break;
     case 'fbud':await saveBud(f,F);break;
     case 'fpo':await savePo(f,F);break;
+    case 'fdqe':await saveDqe(f,F);break;
+    case 'fav':await saveAv(f,F);break;
+    case 'fsit':await saveSit(f,F);break;
+    case 'fstc':await saveStc(f,F);break;
+    case 'fstop':await saveStop(f,F);break;
+    case 'frel':await saveRel(f,F);break;
+    case 'fprev':{const x={id:uid(),sens:F.sens==='S'?'S':'E',mois:F.mois,lib:F.lib.slice(0,100),mt:r2(+F.mt||0),rec:Math.max(1,Math.min(12,Math.round(+F.rec||1)))};await commit('prevs',x,'prévision',x.lib);closeSheet();render();break}
+    case 'fdep':{const x={id:uid(),nom:F.nom.slice(0,60),lieu:(F.lieu||'').slice(0,120),resp:F.resp||''};await commit('deps',x,'nouveau dépôt',x.nom);closeSheet();render();break}
+    case 'ftr':{const it=byId('items',F.item),q=+F.q;if(!(q>0))throw new Error('Quantité invalide');if((F.dep||'')===(F.dep2||''))throw new Error('Choisissez deux dépôts différents');if(depQ(it,F.dep||'',F.date)<q-0.0005)throw new Error('Stock insuffisant dans '+depNom(F.dep||'')+' ('+fmtQ(depQ(it,F.dep||'',F.date))+')');await commit('moves',{id:uid(),date:F.date,item:F.item,type:'T',q,pu:0,motif:(F.motif||'').slice(0,120),dep:F.dep||'',dep2:F.dep2||'',entryId:'',st:'V'},'transfert',it.nom+' '+q);closeSheet();render();toast('Transfert enregistré');break}
+    case 'finv2':await saveInv2(f,F);break;
+    case 'feq':{const id=f.dataset.id,e=id?JSON.parse(JSON.stringify(byId('equips',id))):{id:uid()};Object.assign(e,{nom:F.nom.slice(0,80),type:F.type,unite:F.unite,cpt:Math.max(0,+F.cpt||0),norme:Math.max(0,+F.norme||0),act:F.act,ref:(F.ref||'').slice(0,40)});if(!id)e.cptDate=today();await commit('equips',e,id?'modification équipement':'nouvel équipement',e.nom);closeSheet();render();break}
+    case 'fgam':{const g={id:uid(),eq:f.dataset.e,op:F.op.slice(0,100),tousJ:Math.max(0,Math.round(+F.tousJ||0)),tousC:Math.max(0,+F.tousC||0),lastD:F.lastD||today(),lastC:+F.lastC||0};if(!g.tousJ&&!g.tousC)throw new Error('Indiquez une périodicité');await commit('gammes',g,'gamme d\'entretien',g.op);closeSheet();eqView(g.eq);render();break}
+    case 'fmop':await saveMop(f,F);break;
+    case 'fcg':await saveCg(F);break;
+    case 'fpres':await savePres(f,F);break;
+    case 'fpret':await savePret(F);break;
     case 'fpoinv':await savePoInv(f,F);break;
     case 'flot':await saveLot(f,F);break;
     case 'fpiop':await savePiop(f.dataset.k,F);break;
     case 'fobj':await saveObj(f,F);break;
-    case 'fchmat':{const it=byId('items',F.item),q=+F.q;if(!(q>0))throw new Error('Quantité invalide');const m={id:uid(),date:F.date,item:F.item,type:'S',q,pu:0,motif:(byId('cmds',f.dataset.p)?'Commande : ':'Chantier : ')+jobById(f.dataset.p).nom,proj:f.dataset.p,entryId:'',st:'V'};if(!stockOK(m.item,[...D.moves,m]))throw new Error('Stock insuffisant à cette date');await commit('moves',m,'sortie chantier',it.nom+' '+q);closeSheet();render();toast('Matériel imputé');break}
+    case 'fchmat':{const it=byId('items',F.item),q=+F.q;if(!(q>0))throw new Error('Quantité invalide');const m={id:uid(),date:F.date,item:F.item,type:'S',q,pu:0,motif:(byId('cmds',f.dataset.p)?'Commande : ':'Chantier : ')+jobById(f.dataset.p).nom,proj:f.dataset.p,dep:F.dep||'',entryId:'',st:'V'};if(live(D.deps).length&&depQ(it,m.dep,m.date)<q-0.0005)throw new Error('Stock insuffisant dans '+depNom(m.dep));if(!stockOK(m.item,[...D.moves,m]))throw new Error('Stock insuffisant à cette date');await commit('moves',m,'sortie chantier',it.nom+' '+q);closeSheet();render();toast('Matériel imputé');break}
     case 'fpop':await savePop(f.dataset.k,F);break;
     case 'fproj':{const id=f.dataset.id;if(F.fin<F.debut)throw new Error('La fin est avant le début');const o=id?JSON.parse(JSON.stringify(byId('projects',id))):{id:uid()};Object.assign(o,{nom:F.nom.slice(0,100),act:F.act,resp:F.resp,debut:F.debut,fin:F.fin,statut:F.statut,budget:Math.max(0,+F.budget||0),client:F.client||'',desc:(F.desc||'').slice(0,800)});await commit('projects',o,id?'modification projet':'nouveau projet',o.nom);closeSheet();sub.pid=o.id;go('projet');break}
     case 'ftask':await saveTask(f,F);break;
     case 'frole':{const id=f.dataset.id;const r=id?JSON.parse(JSON.stringify(byId('roles',id))):{id:'r_'+uid()};r.nom=F.nom.trim().slice(0,40);if(ROLES.includes(r.nom))throw new Error('Nom réservé');r.perms={};for(const [p] of PERMS)if(F['p_'+p])r.perms[p]=true;await commit('roles',r,id?'modification rôle':'nouveau rôle',r.nom);closeSheet();render();toast('Rôle enregistré');break}
     case 'fclose':{const m=F.m;if(!ask('Clôturer définitivement jusqu\'au '+dfr(lastDay(m))+' ? Cette action est irréversible.'))return;await closePeriod(m);render();toast('Période clôturée');break}
-    case 'fset':{const s=JSON.parse(JSON.stringify(D.settings));for(const k of ['nom','adresse','rccm','idnat','nif','tel','email','mentions','annexe'])s[k]=(F[k]||'').slice(0,500);for(const k of ['taux','tva','cnssSal','cnssPat','inpp','onem','iprFam','iprFamMax','seuil1','seuil2'])s[k]=Math.max(0,+F[k]||0);if(s.seuil2>0&&validators().length<2)throw new Error('La double validation exige au moins deux utilisateurs ayant le droit de valider. Ajoutez d\'abord un comptable.');if(!(s.taux>0))throw new Error('Taux invalide');s.tvaDefaut=!!F.tvaDefaut;await commitSettings(s,'réglages','');render();toast('Réglages enregistrés');break}
+    case 'fset':{const s=JSON.parse(JSON.stringify(D.settings));for(const k of ['nom','adresse','rccm','idnat','nif','tel','email','mentions','annexe'])s[k]=(F[k]||'').slice(0,500);for(const k of ['taux','tva','cnssSal','cnssPat','inpp','onem','iprFam','iprFamMax','seuil1','seuil2','seuilTreso','tolRetard','cgMois','cgAnc'])s[k]=Math.max(0,+F[k]||0);if(F.feries!==undefined)s.feries=String(F.feries).slice(0,1500);if(s.seuil2>0&&validators().length<2)throw new Error('La double validation exige au moins deux utilisateurs ayant le droit de valider. Ajoutez d\'abord un comptable.');if(!(s.taux>0))throw new Error('Taux invalide');s.tvaDefaut=!!F.tvaDefaut;await commitSettings(s,'réglages','');render();toast('Réglages enregistrés');break}
   }}
 function exportCSV(){
   const t=sub.etat,num=n=>String(r2(n)).replace('.',',');let rows=[];
