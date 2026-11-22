@@ -241,7 +241,7 @@ const TR=c=>TRESO.find(t=>t[0]===c);
 const isTreso=c=>!!TR(c);
 const JR={CA:'Caisse',BQ:'Banque',MM:'Mobile money',AC:'Achats',VE:'Ventes',PA:'Paie',OD:'Opérations diverses',AN:'À-nouveaux'};
 const STK={'311':{l:'Marchandises',ach:'601',v:'6031'},'321':{l:'Matières premières',ach:'602',v:'6032'},'331':{l:'Fournitures consommables',ach:'604',v:'6033'},'361':{l:'Produits finis',ach:null,v:'736'}};
-const COLL=['users','roles','accounts','acts','tiers','items','emps','docs','entries','pays','slips','moves','assets','recs','projects','tasks','parcels','cycles','farmops','bandes','pouops','chops','cmds','budgets','objs','log'];
+const COLL=['users','roles','accounts','acts','tiers','items','emps','docs','aprs','entries','pays','slips','moves','assets','recs','projects','tasks','parcels','cycles','farmops','bandes','pouops','chops','cmds','budgets','objs','pos','lots','pisops','log'];
 const ROLES=['Gérant','Comptable','Saisie'];
 
 /* ============ ÉTAT ============ */
@@ -255,7 +255,7 @@ const live=a=>a.filter(x=>!x.del);
 const byId=(c,id)=>id?D[c].find(x=>x.id===id):undefined;
 const meU=()=>byId('users',ME);
 const role=()=>meU()?.role||'Saisie';
-const PERMS=[['valider','Valider les écritures, émettre factures et avoirs, encaisser, contrepasser'],['etats','Voir le tableau de bord et les états financiers'],['paie','Gérer les employés et la paie'],['stocks','Gérer les stocks (articles et mouvements)'],['immo','Immobilisations et rapprochement bancaire'],['tiers','Créer et modifier clients et fournisseurs'],['projets','Créer et piloter les projets et les tâches'],['ferme','Ferme maraîchère : parcelles, campagnes, opérations'],['poulets','Poulets de chair : bandes et registre d\'élevage'],['chantiers','Électricité et solaire : chantiers, matériel, main-d\'œuvre'],['atelier','Couture et peinture : commandes, mesures, chantiers de peinture']];
+const PERMS=[['valider','Valider les écritures, émettre factures et avoirs, encaisser, contrepasser'],['etats','Voir le tableau de bord et les états financiers'],['paie','Gérer les employés et la paie'],['stocks','Gérer les stocks (articles et mouvements)'],['immo','Immobilisations et rapprochement bancaire'],['tiers','Créer et modifier clients et fournisseurs'],['projets','Créer et piloter les projets et les tâches'],['ferme','Ferme maraîchère : parcelles, campagnes, opérations'],['poulets','Poulets de chair : bandes et registre d\'élevage'],['chantiers','Électricité et solaire : chantiers, matériel, main-d\'œuvre'],['atelier','Couture et peinture : commandes, mesures, chantiers de peinture'],['achats','Achats : demandes, bons de commande, réceptions'],['pisci','Pisciculture : lots, aliment, pêches, récoltes']];
 const BUILTIN={'Gérant':null,'Comptable':null,'Saisie':['stocks','tiers','ferme','poulets']};
 function perm(p,u){u=u||meU();if(!u)return false;const r=u.role;if(r==='Gérant'||r==='Comptable')return true;if(r==='Saisie')return BUILTIN.Saisie.includes(p);const ro=D.roles&&D.roles.find(x=>x.id===r&&!x.del);return !!(ro&&ro.perms&&ro.perms[p])}
 const roleName=r=>BUILTIN[r]!==undefined?r:((D.roles||[]).find(x=>x.id===r)||{}).nom||'Rôle supprimé';
@@ -319,6 +319,7 @@ function canWrite(u,c,r,old){
     case 'entries':
       if(old&&old.st==='V')return 'écriture validée intangible (utilisez la contrepassation)';
       if(r.st==='V'&&!adm)return 'validation réservée au gérant ou au comptable';
+      if(r.st==='V'&&!r.del&&(!old||old.st!=='V')&&needs2(r)){const ap=approvers(r);if(ap.length<2||!ap.includes(u.id))return 'paiement au-delà du seuil : deux validations de personnes différentes requises'}
       if(!adm&&!own)return 'brouillon d\'un autre utilisateur';
       if(!r.del&&!balancedLines(r.lines))return 'écriture déséquilibrée ou invalide';
       if(lockedFor(dt,r.upd)||(old&&lockedFor(odt,r.upd)))return 'période clôturée';
@@ -358,6 +359,24 @@ function canWrite(u,c,r,old){
       if(!(+r.cout>0)||!(+r.duree>=0)||!/^2[0-7]/.test(r.compte||''))return 'immobilisation invalide';
       break;
     case 'projects':if(!(perm('projets',u)||(r.kind==='chantier'&&(perm('chantiers',u)||perm('atelier',u)))))return r.kind==='chantier'?'droit « chantiers » requis':'droit « projets » requis';break;
+    case 'aprs':if(old)return 'approbation intangible';if(r.u!==u.id||!adm)return 'approbation invalide';break;
+    case 'pos':{
+      if(!old){if(!(perm('achats',u)||adm))return 'droit « achats » requis';if(r.statut!=='Demande'||r.dem!==u.id)return 'demande d\'achat invalide';break}
+      const a=old.statut,b=r.statut,gr=R==='Gérant',big=(+D.settings.seuil1||0)>0&&+r.total>=+D.settings.seuil1,ORD={Demande:0,Approuvée:1,Commandée:2,Reçue:3,Facturée:4};
+      if(r.del){if(!(adm||(own&&a==='Demande')))return 'suppression non autorisée';break}
+      if(a===b){if(a==='Demande'&&(own||adm))break;return 'modification non autorisée à cette étape'}
+      if(b==='Rejetée'){if(a!=='Demande')return 'seule une demande se rejette';if(!(big?gr:adm))return 'rejet non autorisé';if(r.apb!==u.id)return 'approbateur incohérent';if(!sameExcept(old,r,['statut','apb','apd','rej']))return 'demande modifiée pendant le rejet';break}
+      if(b==='Annulée'){if(a==='Facturée'||a==='Reçue')return 'commande déjà reçue ou facturée';if(!(adm||(own&&a==='Demande')))return 'annulation non autorisée';break}
+      if(!(a in ORD)||!(b in ORD)||ORD[b]<=ORD[a])return 'changement d\'étape non autorisé';
+      if(!sameExcept(old,r,['statut','apb','apd','rej','bc','cdate','rdate','rby','fnum','fdate','entryId']))return 'contenu de la commande modifié après la demande';
+      if(!poApproved(r))return big?'approbation du gérant manquante ou invalide':'approbation manquante ou invalide';
+      if(b==='Approuvée'&&r.apb!==u.id)return 'approbateur incohérent';
+      if(b==='Commandée'&&!(perm('achats',u)||adm))return 'droit « achats » requis';
+      if(b==='Reçue'&&!(perm('achats',u)||perm('stocks',u)||adm))return 'réception non autorisée';
+      if(b==='Facturée'&&!adm)return 'facture fournisseur réservée au gérant ou au comptable';
+      break}
+    case 'lots':if(!perm('pisci',u))return 'droit « pisciculture » requis';break;
+    case 'pisops':if(!perm('pisci',u))return 'droit « pisciculture » requis';if(old&&!adm&&!own)return 'modification réservée à son auteur';break;
     case 'budgets':if(!perm('valider',u))return 'budget réservé au gérant ou au comptable';break;
     case 'objs':if(!perm('valider',u)&&!(old&&old.resp===u.id&&sameExcept(old,r,['actuel'])))return 'objectif réservé au gérant ou au comptable';break;
     case 'cmds':if(!perm('atelier',u))return 'droit « atelier » requis';if(r.del&&!adm&&!own)return 'suppression réservée à son auteur';break;
@@ -388,6 +407,7 @@ const newer=(a,b)=>!b||a.ver>b.ver||(a.ver===b.ver&&(a.upd>b.upd||(a.upd===b.upd
 async function commit(c,r,action,sum,opt={}){
   {const mu=meU(),mk=mu&&mu.keys.find(k=>k.kid===KID);if(mk&&mk.rev)throw new Error('L\'accès de cet appareil a été révoqué par le gérant')}
   const old=D[c].find(x=>x.id===r.id);
+  if(c==='entries'&&r.st==='V'&&!r.del&&(!old||old.st!=='V')&&needs2(r)&&perm('valider',meU())){const h=ehash(r);if(!D.aprs.some(a=>!a.del&&a.e===r.id&&a.u===ME&&a.h===h))await commit('aprs',{id:uid(),e:r.id,u:ME,h,date:today()},'approbation paiement',r.lib);if(approvers(r).length<2){r.st='B';setTimeout(()=>toast('Paiement de '+money(outflow(r))+' : en attente de la deuxième validation'),1600)}}
   const oldCopy=old?JSON.parse(JSON.stringify(old)):null;
   r.cr=old?old.cr:ME;r.by=ME;r.kid=KID;r.ver=(old?.ver||0)+1;r.upd=NOW();r.dev=HDR.dev;delete r.sig;
   const err=canWrite(meU()||(c==='users'?r:null),c,r,oldCopy);if(err)throw new Error(err);
@@ -451,6 +471,9 @@ function validRec(c,r){
   if(c==='cmds'&&!RX.date.test(r.livr||''))return false;
   if(c==='budgets'&&!(Number.isInteger(r.y)&&Array.isArray(r.prod)&&Array.isArray(r.chg)&&r.prod.length===12&&r.chg.length===12))return false;
   if(c==='objs'&&!Number.isInteger(r.y))return false;
+  if(c==='aprs'&&!(RX.id.test(r.e||'')&&typeof r.h==='string'))return false;
+  if(c==='pos'&&!(RX.date.test(r.date||'')&&Array.isArray(r.lignes)))return false;
+  if((c==='lots'||c==='pisops')&&!RX.date.test(r.date||''))return false;
   if(c==='recs'&&!Array.isArray(r.points))return false;
   if(c==='accounts'&&!RX.code.test(r.code||''))return false;
   if(c==='entries'&&!r.del&&!balancedLines(r.lines))return false;
@@ -564,11 +587,11 @@ function go(v){view=v;UI.view=v;saveUI();render();window.scrollTo(0,0)}
 function render(){
   if(!D){document.body.classList.add('locked');$('#app').innerHTML=HDR?lockScreen():setupScreen();return}
   document.body.classList.remove('locked');
-  const NV={stocks:'plus',paie:'plus',etats:'plus',reglages:'plus',projet:'projets',commande:'activites',direction:'plus'}[view]||view;
+  const NV={stocks:'plus',paie:'plus',etats:'plus',reglages:'plus',projet:'projets',commande:'activites',direction:'plus',achats:'plus',lot:'activites'}[view]||view;
   $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.go===NV));
   $('#who').textContent=(meU()?.nom||'?').split(' ')[0]+' · '+roleName(role());
   $('#sttl').textContent=D.settings.nom+' · '+EX()+' · tenue en '+BASE();
-  const V={accueil,saisir,factures,stocks,paie,etats,reglages,activites,projets,projet:projetView,commande:cmdView,direction,plus:plusView};
+  const V={accueil,saisir,factures,stocks,paie,etats,reglages,activites,projets,projet:projetView,commande:cmdView,direction,achats,lot:lotView,plus:plusView};
   $('#app').innerHTML=(V[view]||accueil)();
 }
 function openSheet(h){$('#sheet').innerHTML=h;$('#ov').classList.add('on');setTimeout(()=>{const f=$('#sheet input:not([type=hidden]),#sheet select');f&&f.focus()},50)}
@@ -775,6 +798,10 @@ function alertes(){
   if(SRV()&&SYNC.err)a.push(['r','Synchronisation serveur en erreur : '+esc(SYNC.err),'reglages']);
   for(const b of live(D.bandes).filter(b=>b.statut!=='Clôturée')){const s=bandeStats(b);if(s.lastM&&s.init&&s.lastM[1]/s.init>0.01&&s.lastM[0]>=addDays(t,-2))a.push(['r',`${esc(b.nom)} : mortalité de ${fmtQ(s.lastM[1])} sujets le ${dfr(s.lastM[0])} (plus de 1 %)`,'activites']);if(s.age>(+b.duree||42)+7)a.push(['o',`${esc(b.nom)} a ${s.age} jours : au-delà de la durée prévue`,'activites'])}
   {const myLate=live(D.tasks).filter(x=>x.resp===ME&&(+x.av||0)<100&&x.fin<t);if(myLate.length)a.push(['r',`${myLate.length} tâche(s) qui vous sont attribuées sont en retard`,'projets'])}
+  if(isAdmin()){const w=live(D.entries).filter(e=>e.st==='B'&&needs2(e)&&!approvers(e).includes(ME));if(w.length)a.push(['r',`${w.length} paiement(s) au-delà du seuil attendent votre validation`,'saisir'])}
+  {const w=live(D.pos).filter(canApprove);if(w.length)a.push(['o',`${w.length} demande(s) d'achat à approuver (${money(w.reduce((s,p)=>s+(+p.total||0),0))})`,'achats'])}
+  {const w=live(D.pos).filter(p=>p.statut==='Commandée'&&p.cdate<addDays(t,-14));if(w.length)a.push(['o',`${w.length} commande(s) fournisseur non reçue(s) depuis plus de 14 jours`,'achats'])}
+  for(const l of live(D.lots).filter(l=>l.statut!=='Clôturé')){const s=lotStats(l);if(s.lastM&&s.init&&s.lastM[1]/s.init>0.02&&s.lastM[0]>=addDays(t,-2))a.push(['r',`${esc(l.nom)} : mortalité de ${fmtQ(s.lastM[1])} poissons le ${dfr(s.lastM[0])} (plus de 2 %)`,'activites']);if(s.age>(+l.duree||180)+15)a.push(['o',`${esc(l.nom)} : durée d'élevage dépassée (${s.age} jours)`,'activites'])}
   for(const c of live(D.cmds).filter(c=>c.statut!=='Livrée')){if(c.livr<t)a.push(['r',`Commande ${esc(c.num)} de ${esc(tiersNom(c.client))} en retard : livraison promise le ${dfr(c.livr)}`,'activites']);else if(c.livr<=addDays(t,2)&&c.statut!=='Prête')a.push(['o',`Commande ${esc(c.num)} à livrer le ${dfr(c.livr)}, encore à l'étape « ${esc(c.statut)} »`,'activites'])}
   for(const p of live(D.projects).filter(p=>p.kind==='chantier'&&['Accepté','En cours'].includes(p.statut)&&p.fin<t))a.push(['o',`Chantier ${esc(p.nom)} : fin prévue le ${dfr(p.fin)} dépassée`,'activites']);
   const lm=new Date();lm.setDate(0);const prevM=lm.toLocaleDateString('sv-SE').slice(0,7);
@@ -831,7 +858,7 @@ function saisir(){
 function entryCard(e){
   const tot=r2(e.lines.reduce((s,l)=>s+(+l.d||0),0)),dr=e.st==='B',rev=!dr&&isReversed(e.id);
   return `<div class="card ${dr?'dr':''}"><div class="top"><b>${esc(e.lib)}</b><span class="amt">${money(tot)}</span></div>
-  <div class="small muted">${dfr(e.date)} · ${esc(JR[e.jr]||e.jr)} · ${esc(e.piece||'sans pièce')} · ${esc(actNom(e.act))} · ${esc(userNom(e.cr))} ${dr?'<span class="tag">Brouillon</span>':rev?'<span class="tag r">Contrepassée</span>':e.revOf?'<span class="tag">Contrepassation</span>':''}</div>
+  <div class="small muted">${dfr(e.date)} · ${esc(JR[e.jr]||e.jr)} · ${esc(e.piece||'sans pièce')} · ${esc(actNom(e.act))} · ${esc(userNom(e.cr))} ${dr&&needs2(e)?`<span class="tag y">Double validation ${approvers(e).length}/2${approvers(e).includes(ME)?' (vous avez validé)':''}</span> `:''}${dr?'<span class="tag">Brouillon</span>':rev?'<span class="tag r">Contrepassée</span>':e.revOf?'<span class="tag">Contrepassation</span>':''}</div>
   <table>${e.lines.map(l=>`<tr><td>${esc(l.c)}</td><td>${esc(accLib(l.c))}${l.t?' — '+esc(tiersNom(l.t)):''}${l.fx&&l.fx.cur!==BASE()?` <span class="small muted">(${money(l.fx.a,l.fx.cur)})</span>`:''}</td><td class="n">${+l.d?fmt(l.d):''}</td><td class="n">${+l.k?fmt(l.k):''}</td></tr>`).join('')}</table>
   <div class="btns" style="margin-bottom:0">${dr?`${isAdmin()?`<button class="pr" data-act="validate" data-id="${esc(e.id)}">Valider</button>`:''}${(isAdmin()||e.cr===ME)?`<button class="ghost" data-act="editEntry" data-id="${esc(e.id)}">Modifier</button><button class="dg" data-act="delEntry" data-id="${esc(e.id)}">Supprimer</button>`:''}`
    :(isAdmin()&&!rev&&!e.revOf&&!locked(today())?`<button class="ghost" data-act="reverse" data-id="${esc(e.id)}">Contrepasser</button>`:'')}</div></div>`;
@@ -1104,7 +1131,7 @@ function empForm(id){
   <label class="f">Nom complet<input name="nom" value="${esc(e.nom)}" required maxlength="120"></label>
   <div class="row2"><label class="f">Poste<input name="poste" value="${esc(e.poste)}" maxlength="80"></label><label class="f">Téléphone<input name="tel" value="${esc(e.tel)}" inputmode="tel" maxlength="40"></label></div>
   <div class="row2"><label class="f">Salaire de base mensuel<input type="number" name="base" step="0.01" min="0" value="${e.base||''}" required></label><label class="f">Devise du salaire<select name="cur">${optCur(e.cur)}</select></label></div>
-  <div class="row2"><label class="f">N° CNSS<input name="cnss" value="${esc(e.cnss)}" maxlength="40"></label><label class="f">Activité<select name="act">${optActs(e.act)}</select></label></div>
+  <div class="row2"><label class="f">N° CNSS<input name="cnss" value="${esc(e.cnss)}" maxlength="40"></label><label class="f">Personnes à charge (IPR)<input type="number" name="pac" step="1" min="0" max="20" value="${esc(e.pac||0)}"></label><label class="f">Activité<select name="act">${optActs(e.act)}</select></label></div>
   <label class="chk"><input type="checkbox" name="actif" ${e.actif!==false?'checked':''}> Employé actif</label>
   <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`);
 }
@@ -1115,9 +1142,10 @@ function slipForm(id){
   const c=s.id?slipCalc(s):null;
   openSheet(`<h2>Bulletin de paie ${s.st!=='B'?'<span class="tag">'+({V:'Validé',P:'Payé',X:'Annulé'}[s.st])+'</span>':''}</h2><form id="fs" data-id="${esc(s.id)}">
   <fieldset ${ro?'disabled':''} style="border:0;padding:0;margin:0">
-  <div class="row2"><label class="f">Mois<input type="month" name="mois" value="${esc(s.mois)}" required></label><label class="f">Employé<select name="emp" required>${emps.map(e=>`<option value="${esc(e.id)}" data-b="${esc(e.base)}" data-c="${esc(e.cur)}" ${e.id===s.emp?'selected':''}>${esc(e.nom)} (${esc(e.cur)})</option>`).join('')}</select></label></div>
+  <div class="row2"><label class="f">Mois<input type="month" name="mois" value="${esc(s.mois)}" required></label><label class="f">Employé<select name="emp" required>${emps.map(e=>`<option value="${esc(e.id)}" data-b="${esc(e.base)}" data-c="${esc(e.cur)}" data-p="${esc(e.pac||0)}" ${e.id===s.emp?'selected':''}>${esc(e.nom)} (${esc(e.cur)})</option>`).join('')}</select></label></div>
   <div class="row2"><label class="f">Salaire de base<input type="number" name="base" step="0.01" min="0" value="${esc(s.base||(emps[0]||{}).base||0)}"></label><label class="f">Primes et heures sup.<input type="number" name="primes" step="0.01" min="0" value="${esc(s.primes||0)}"></label></div>
   <div class="row2"><label class="f">Indemnités (transport, logement)<input type="number" name="indem" step="0.01" min="0" value="${esc(s.indem||0)}"></label><label class="f">IPR retenu<input type="number" name="ipr" step="0.01" min="0" value="${esc(s.ipr||0)}"></label></div>
+  <label class="chk"><input type="checkbox" name="iprAuto" ${!s.id||s.iprAuto?'checked':''}> Calculer l'IPR avec le barème (personnes à charge de la fiche employé)</label>
   <label class="f">Avance à retenir<input type="number" name="avance" step="0.01" min="0" value="${esc(s.avance||0)}"></label></fieldset>
   <div class="balbar"><span>Net à payer</span><span id="snet">${c?money(c.net,s.cur):''}</span></div><p class="small muted" id="sdet"></p>
   <div class="btns">${!ro?`<button class="pr" type="submit">Enregistrer le brouillon</button>`:''}${s.id&&s.st==='B'&&!ro?`<button type="button" data-act="valSlip" data-id="${esc(s.id)}">Valider et comptabiliser</button>`:''}${s.st==='V'?`<button type="button" class="pr" data-act="paySlip" data-id="${esc(s.id)}">Payer</button><button type="button" class="dg" data-act="cancelSlip" data-id="${esc(s.id)}">Annuler (contrepassation)</button>`:''}${s.id?`<button type="button" class="ghost" data-act="printSlip" data-id="${esc(s.id)}">Imprimer</button>`:''}${s.id&&s.st==='B'&&!ro?`<button type="button" class="dg" data-act="delSlip" data-id="${esc(s.id)}">Supprimer</button>`:''}<button type="button" class="ghost" data-act="close">Fermer</button></div></form>`);
@@ -1125,7 +1153,7 @@ function slipForm(id){
 }
 function autoMt2(){const x=$('#fq [name=mt2]');if(!x||x.dataset.typed)return;const f=Object.fromEntries(new FormData($('#fq')));if(!f.tr||!f.tr2||!(+f.mt>0))return;const c1=TR(f.tr)[2],c2=TR(f.tr2)[2];x.value=c1===c2?f.mt:r2(c1==='USD'?f.mt*f.rate:f.mt/f.rate)}
 function sForm(){return Object.fromEntries(new FormData($('#fs')))}
-function sCalc(){if(!$('#fs')||$('#fs fieldset').disabled)return;const f=sForm();const o=$('#fs [name=emp]').selectedOptions[0];const c=slipCalc(f);const cur=o?o.dataset.c:'USD';$('#snet').textContent=money(c.net,cur);$('#sdet').textContent=`CNSS salarié ${fmt(c.cnssS)} · charges patronales ${fmt(c.patr)} · coût employeur ${money(c.cout,cur)}`}
+function sCalc(){if(!$('#fs')||$('#fs fieldset').disabled)return;let f=sForm();const o=$('#fs [name=emp]').selectedOptions[0];if(f.iprAuto&&o){const bi=r2((+f.base||0)+(+f.primes||0));$('#fs [name=ipr]').value=iprCalc(bi,r2(bi*D.settings.cnssSal/100),o.dataset.c,+o.dataset.p||0);f=sForm()}const c=slipCalc(f);const cur=o?o.dataset.c:'USD';$('#snet').textContent=money(c.net,cur);$('#sdet').textContent=`CNSS salarié ${fmt(c.cnssS)} · charges patronales ${fmt(c.patr)} · coût employeur ${money(c.cout,cur)}`}
 function slipHTML(s){const c=slipCalc(s),e=byId('emps',s.emp)||{},S=D.settings,[y,m]=s.mois.split('-'),M=x=>money(x,s.cur);
   return `<div class="doc">${s.st==='B'?'<div class="wm">BROUILLON</div>':''}${s.st==='X'?'<div class="wm">ANNULÉ</div>':''}<div class="hd"><div><h1>${esc(S.nom)}</h1>${esc(S.adresse)}</div><div style="text-align:right"><h1>BULLETIN DE PAIE</h1>${MOISL[+m-1]} ${esc(y)}</div></div>
   <p><b>${esc(e.nom)}</b> — ${esc(e.poste)}${e.cnss?' — CNSS '+esc(e.cnss):''}</p>
@@ -1232,6 +1260,11 @@ function reglages(){
     <div class="row2"><label class="f">Taux de TVA (%)<input type="number" name="tva" step="0.1" min="0" value="${esc(S.tva)}"></label><label class="chk" style="margin-top:28px"><input type="checkbox" name="tvaDefaut" ${S.tvaDefaut?'checked':''}> TVA cochée par défaut</label></div>
     <div class="row2"><label class="f">CNSS salarié (%)<input type="number" name="cnssSal" step="0.01" min="0" value="${esc(S.cnssSal)}"></label><label class="f">CNSS employeur (%)<input type="number" name="cnssPat" step="0.01" min="0" value="${esc(S.cnssPat)}"></label></div>
     <div class="row2"><label class="f">INPP (%)<input type="number" name="inpp" step="0.01" min="0" value="${esc(S.inpp)}"></label><label class="f">ONEM (%)<input type="number" name="onem" step="0.01" min="0" value="${esc(S.onem)}"></label></div>
+    <div class="row2"><label class="f">IPR : réduction par personne à charge (% de l'impôt)<input type="number" name="iprFam" step="0.1" min="0" value="${esc(S.iprFam??2)}"></label><label class="f">IPR : personnes à charge au maximum<input type="number" name="iprFamMax" step="1" min="0" value="${esc(S.iprFamMax??9)}"></label></div>
+    <p class="small muted">Barème IPR appliqué au douzième : 3 % jusqu'à 1 944 000 FC par an, 15 % jusqu'à 21 600 000, 30 % jusqu'à 43 200 000, 40 % au-delà ; impôt plafonné à 30 % du revenu imposable (brut moins CNSS salarié). Faites confirmer ces paramètres par votre comptable.</p>
+    <h3>Contrôle interne</h3>
+    <div class="row2"><label class="f">Demandes d'achat approuvées par le gérant à partir de (${BASE()})<input type="number" name="seuil1" step="1" min="0" value="${esc(S.seuil1||'')}" placeholder="ex. 1 000 000"></label><label class="f">Paiements soumis à deux validations à partir de (${BASE()})<input type="number" name="seuil2" step="1" min="0" value="${esc(S.seuil2||'')}" placeholder="ex. 5 000 000"></label></div>
+    <p class="small muted">Laissez vide pour désactiver. La double validation exige au moins deux personnes ayant le droit de valider (gérant et comptable, par exemple).</p>
     <label class="f">Mentions en bas des factures<textarea name="mentions" maxlength="500">${esc(S.mentions)}</textarea></label>
     <label class="f">Engagements hors bilan et événements postérieurs (notes annexes)<textarea name="annexe" maxlength="500" placeholder="Néant à la connaissance de la direction…">${esc(S.annexe||'')}</textarea></label>
     <div class="row2"><label class="f">Logo (PNG ou JPEG)<input type="file" accept="image/png,image/jpeg" id="logo"></label><label class="f">Signature scannée<input type="file" accept="image/png,image/jpeg" id="sig"></label></div>
@@ -1281,12 +1314,13 @@ function pilotage(){
   ${(()=>{const cs=live(D.projects).filter(p=>p.kind==='chantier'&&!isPeint(p));const act=cs.filter(p=>['Accepté','En cours','Réceptionné'].includes(p.statut));const car=act.reduce((s,p)=>s+Math.max(0,(+p.montant||0)-chStats(p).facture),0);return `<div class="acard" data-go="activites" data-sub3="elec"><h4>Électricité & solaire</h4><div class="kpi" style="border:0;padding:0"><div class="v">${act.length} chantier(s)</div><div class="l">carnet ${money(car)}</div></div></div>`})()}
   ${(()=>{const t=today(),o=live(D.cmds).filter(c=>c.statut!=='Livrée'),l=o.filter(c=>c.livr<t).length,pc=live(D.projects).filter(p=>p.kind==='chantier'&&isPeint(p)&&!['Clôturé','Prospect'].includes(p.statut)).length;return `<div class="acard" data-go="activites" data-sub3="couture"><h4>Couture & peinture</h4><div class="kpi" style="border:0;padding:0"><div class="v">${o.length} commande(s)</div><div class="l">${l?l+' en retard · ':''}${pc} chantier(s) de peinture</div></div></div>`})()}
   ${perm('etats')?(()=>{const y=EX(),t=today(),mo=String(y)===t.slice(0,4)?t.slice(0,7):y+'-12',ms=monthsBetween(y+'-01',mo),b=budPer(ms),k=perKpi(y+'-01-01',lastDay(mo));return `<div class="acard" data-go="direction"><h4>Direction</h4><div class="kpi" style="border:0;padding:0"><div class="v">${b.any&&b.p?Math.round(k.p/b.p*100)+' % du budget':'Budget à saisir'}</div><div class="l">tableau de bord, rapports PDF</div></div></div>`})():''}
+  ${live(D.lots).length?(()=>{let e=0,b=0;const ls=live(D.lots).filter(l=>l.statut!=='Clôturé');for(const l of ls){const s=lotStats(l);e+=s.eff;b+=s.bio}return `<div class="acard" data-go="activites" data-sub3="pisci"><h4>Pisciculture</h4><div class="kpi" style="border:0;padding:0"><div class="v">${fmt(b)} kg</div><div class="l">${ls.length} lot(s) · ${fmtQ(e)} poissons</div></div></div>`})():''}
   <div class="acard" data-go="projets"><h4>Projets</h4><div class="kpi" style="border:0;padding:0"><div class="v">${projs.length} actif(s)</div><div class="l ${plate?'neg':''}">${plate?plate+' en retard':'aucun retard'}</div></div></div>
   <div class="acard" data-go="projets" data-sub2="mine"><h4>Mes tâches</h4><div class="kpi" style="border:0;padding:0"><div class="v">${my.length} ouverte(s)</div><div class="l ${late?'neg':''}">${late?late+' en retard':'à jour'}</div></div></div>
   </div>`;
 }
 function plusView(){
-  const T=[['direction','Direction','Tableau de bord interactif, budgets, objectifs, rapports PDF'],['stocks','Actifs','Stocks, immobilisations'],['paie','Paie','Employés, bulletins'],['etats','États financiers','Bilan, résultat, journal, TVA, rapprochement'],['reglages','Réglages','Synchronisation, utilisateurs, rôles, clôture, audit']];
+  const T=[['direction','Direction','Tableau de bord interactif, budgets, objectifs, rapports PDF'],['achats','Achats','Demandes, approbations, bons de commande, réceptions'],['stocks','Actifs','Stocks, immobilisations'],['paie','Paie','Employés, bulletins'],['etats','États financiers','Bilan, résultat, journal, TVA, rapprochement'],['reglages','Réglages','Synchronisation, utilisateurs, rôles, clôture, audit']];
   return `<h2>Plus</h2><div class="tiles">${T.map(([v,l,d])=>`<button data-go="${v}">${l}<span>${d}</span></button>`).join('')}</div>`;
 }
 const bk=(v,l)=>`<button class="ghost" data-go="${v}" style="margin-bottom:10px">← ${l}</button>`;
@@ -1306,9 +1340,9 @@ function cycleStats(c){
 function weekKey(d){const x=new Date(d+'T12:00:00');const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);return x.toLocaleDateString('sv-SE')}
 function activites(){
   const a=sub.act||'ferme';
-  const tabs=[['ferme','Ferme maraîchère',1],['poulets','Poulets de chair',1],['elec','Électricité & solaire',1],['couture','Couture & peinture',1]];
+  const tabs=[['ferme','Ferme maraîchère',1],['poulets','Poulets de chair',1],['elec','Électricité & solaire',1],['couture','Couture & peinture',1],['pisci','Pisciculture',1]];
   return `<h2>Activités</h2><div class="seg">${tabs.map(([k,l,on])=>`<button class="${a===k?'on':''} ${on?'':'soon'}" data-act="sub" data-k="act" data-v="${k}">${l}</button>`).join('')}</div>
-  ${a==='ferme'?fermeView():a==='poulets'?poulView():a==='elec'?elecView():a==='couture'?coutView():`<div class="card"><b>${esc(tabs.find(x=>x[0]===a)[1])}</b><p class="muted">Ce module arrive dans une prochaine étape. En attendant, ses opérations se saisissent dans « Saisir » avec l'activité correspondante, et sa rentabilité apparaît dans les états.</p></div>`}`;
+  ${a==='ferme'?fermeView():a==='poulets'?poulView():a==='elec'?elecView():a==='couture'?coutView():a==='pisci'?pisView():`<div class="card"><b>${esc(tabs.find(x=>x[0]===a)[1])}</b><p class="muted">Ce module arrive dans une prochaine étape. En attendant, ses opérations se saisissent dans « Saisir » avec l'activité correspondante, et sa rentabilité apparaît dans les états.</p></div>`}`;
 }
 function fermeView(){
   const ps=live(D.parcels),cs=live(D.cycles).sort((x,y)=>y.semis.localeCompare(x.semis)),can=perm('ferme');
@@ -1799,6 +1833,7 @@ function rapportHTML(mo){
   {const bs=live(D.bandes).filter(b=>b.statut!=='Clôturée');let eff=0;for(const b of bs)eff+=bandeStats(b).eff;const po=live(D.pouops).filter(o=>inM(o.date)),mort=po.filter(o=>o.type==='M').reduce((s,o)=>s+(+o.qte||0),0),kgv=po.filter(o=>o.type==='V').reduce((s,o)=>s+(+o.kg||0),0),ca=po.filter(o=>o.type==='V').reduce((s,o)=>s+(+o.montant||0),0);if(bs.length||kgv)ops.push(['Poulets de chair',`${bs.length} bande(s) en cours, ${fmtQ(eff)} sujets vivants · mortalité du mois ${fmtQ(mort)} · ventes ${fmtQ(kgv)} kg pour ${money(ca)}`])}
   const chs=live(D.projects).filter(p=>p.kind==='chantier'),fac=ids=>r2(live(D.docs).filter(d=>ids.includes(d.proj)&&d.type==='F'&&d.st==='E'&&inM(d.date)).reduce((s,d)=>s+toBase(docTot(d).ht,d.cur,d.rate),0));
   for(const [lb,pt] of [['Électricité & solaire',0],['Peinture',1]]){const l=chs.filter(p=>isPeint(p)===!!pt),ac=l.filter(p=>['Accepté','En cours','Réceptionné'].includes(p.statut));if(l.length){const car=r2(ac.reduce((s,p)=>s+Math.max(0,(+p.montant||0)-chStats(p).facture),0));ops.push([lb,`${ac.length} chantier(s) actif(s) · carnet de commandes ${money(car)} · facturé ce mois ${money(fac(l.map(p=>p.id)))} · ${l.filter(p=>['Prospect','Devis envoyé'].includes(p.statut)).length} devis en attente`])}}
+  {const ls=live(D.lots).filter(l=>l.statut!=='Clôturé'),po=live(D.pisops).filter(o=>inM(o.date)&&o.type==='R');if(ls.length||po.length){let e=0,b=0;for(const l of ls){const s=lotStats(l);e+=s.eff;b+=s.bio}ops.push(['Pisciculture',`${ls.length} lot(s) en cours, ${fmtQ(e)} poissons, biomasse estimée ${fmt(b)} kg · récolté ce mois ${fmt(po.reduce((s,o)=>s+(+o.kg||0),0))} kg pour ${money(po.reduce((s,o)=>s+(+o.montant||0),0))}`])}}
   {const cs=live(D.cmds);if(cs.length){const rec=cs.filter(c=>inM(c.date)),liv=cs.filter(c=>c.statut==='Livrée'&&inM(c.livr)),late=cs.filter(c=>c.statut!=='Livrée'&&c.livr<to);ops.push(['Couture',`${rec.length} commande(s) reçue(s) pour ${money(rec.reduce((s,c)=>s+(+c.montant||0),0))} · ${liv.length} livrée(s) · ${cs.filter(c=>c.statut!=='Livrée').length} en cours dont ${late.length} en retard`])}}
   {const ps=live(D.projects).filter(p=>p.kind!=='chantier'&&p.statut!=='Terminé'&&p.statut!=='Annulé');if(ps.length){let late=0,av=0;for(const p of ps){const s=projStats(p);late+=s.late;av+=s.av}ops.push(['Projets internes',`${ps.length} projet(s) en cours · avancement moyen ${Math.round(av/ps.length)} % · ${late} tâche(s) en retard`])}}
   const trs=T(['Compte','Solde','Contre-valeur'],TRESO.map(([c,l,cur])=>{const v=tresoFx(to)[c]||0;return v?[l,money(v,cur),money(toBase(v,cur))]:null}).filter(Boolean));
@@ -1863,6 +1898,166 @@ function vAnnexes(){
   N('Engagements hors bilan et événements postérieurs',`<p>${esc(S.annexe||'Néant à la connaissance de la direction à la date d\'établissement des comptes.')}</p>`);
   return `<p class="small muted">Notes établies automatiquement à partir des écritures validées de l'exercice ${y}. Le texte de la dernière note se modifie dans Réglages › Société.</p>`+n.join('');
 }
+
+/* ============ CONTRÔLE INTERNE : DOUBLE VALIDATION DES PAIEMENTS ============ */
+function seuil2(){return +(D.settings&&D.settings.seuil2)||0}
+function seuil1(){return +(D.settings&&D.settings.seuil1)||0}
+function outflow(e){return r2((e.lines||[]).filter(l=>isTreso(l.c)).reduce((s,l)=>s+(+l.k||0),0))}
+function needs2(e){const s=seuil2();return s>0&&outflow(e)>=s}
+function fnv(str){let h=0x811c9dc5,g=0x01000193;for(let i=0;i<str.length;i++){const c=str.charCodeAt(i);h=Math.imul(h^c,16777619)>>>0;g=Math.imul(g^c,2246822519)>>>0}return h.toString(36)+g.toString(36)}
+function ehash(e){return fnv(canon({date:e.date,lines:e.lines,act:e.act||''},[]))}
+function approvers(e){const h=ehash(e);return [...new Set((D.aprs||[]).filter(a=>!a.del&&a.e===e.id&&a.h===h).map(a=>a.u))].filter(id=>{const x=D.users.find(z=>z.id===id&&!z.del);return x&&perm('valider',x)})}
+function validators(){return live(D.users).filter(u=>u.actif!==false&&perm('valider',u))}
+/* ============ ACHATS : DEMANDES, APPROBATION, BONS DE COMMANDE, RÉCEPTION ============ */
+const POST=['Demande','Approuvée','Commandée','Reçue','Facturée'];
+const POTAG={Demande:'y',Approuvée:'g',Commandée:'g',Reçue:'g',Facturée:'',Rejetée:'r',Annulée:'r'};
+function poNum(pre){const y=today().slice(0,4),p=pre+'-'+y+'-'+LOC.code;let mx=0;for(const x of D.pos)for(const k of ['num','bc'])if(x[k]&&x[k].startsWith(p)){const n=parseInt(x[k].slice(p.length));if(n>mx)mx=n}return p+String(mx+1).padStart(4,'0')}
+function phash(p){return fnv(canon({lignes:p.lignes,total:p.total,fourn:p.fourn,act:p.act,proj:p.proj||''},[]))}
+function poApproved(p){const ap=D.users.find(x=>x.id===p.apb&&!x.del);if(!ap)return false;const big=seuil1()>0&&+p.total>=seuil1();if(!(big?ap.role==='Gérant':perm('valider',ap)))return false;if(p.dem===ap.id&&ap.role!=='Gérant')return false;const h=phash(p);return (D.aprs||[]).some(a=>!a.del&&a.e===p.id&&a.u===ap.id&&a.h===h)}
+function poBig(p){return seuil1()>0&&+p.total>=seuil1()}
+function canApprove(p){return p.statut==='Demande'&&(poBig(p)?isGerant():isAdmin())&&(p.dem!==ME||isGerant())}
+function achats(){
+  const ps=live(D.pos).sort((a,b)=>b.date.localeCompare(a.date)||b.upd-a.upd),v=sub.pov||'todo',can=perm('achats')||isAdmin();
+  const sum=l=>l.reduce((s,p)=>s+(+p.total||0),0),dem=ps.filter(p=>p.statut==='Demande'),apr=ps.filter(p=>p.statut==='Approuvée'),cmd=ps.filter(p=>p.statut==='Commandée'),rec=ps.filter(p=>p.statut==='Reçue');
+  const list=v==='todo'?ps.filter(p=>['Demande','Approuvée','Commandée','Reçue'].includes(p.statut)):ps;
+  return `<h2>Achats</h2>
+  <div class="kpis"><div class="kpi"><div class="l">Demandes à approuver</div><div class="v">${dem.length}</div><div class="small muted">${money(sum(dem))}</div></div><div class="kpi"><div class="l">Approuvées, à commander</div><div class="v">${apr.length}</div></div>
+  <div class="kpi"><div class="l">Commandées, à réceptionner</div><div class="v">${cmd.length}</div></div><div class="kpi"><div class="l">Engagé non facturé</div><div class="v">${money(sum([...apr,...cmd,...rec]))}</div></div></div>
+  ${can?'<div class="btns"><button class="pr" data-act="poForm">+ Demande d\'achat</button></div>':''}
+  <div class="seg"><button class="${v==='todo'?'on':''}" data-act="sub" data-k="pov" data-v="todo">À traiter</button><button class="${v==='all'?'on':''}" data-act="sub" data-k="pov" data-v="all">Toutes</button></div>
+  ${list.length?list.map(p=>`<div class="card" data-act="openPo" data-id="${esc(p.id)}" style="cursor:pointer"><div class="top"><span><b>${esc(p.bc||p.num)}</b> · ${esc(tiersNom(p.fourn))}</span><span class="amt">${money(p.total)}</span></div>
+   <div class="small muted">${dfr(p.date)} · demandé par ${esc(userNom(p.dem))} · ${esc(actNom(p.act))}${p.motif?' · '+esc(p.motif):''}</div><span class="tag ${POTAG[p.statut]||''}">${esc(p.statut)}</span>${canApprove(p)?' <span class="tag y">À votre approbation</span>':''}${poBig(p)&&p.statut==='Demande'?' <span class="small muted">au-delà du seuil : approbation du gérant</span>':''}</div>`).join(''):'<p class="empty">Aucune demande. Le circuit : demande d\'achat → approbation → bon de commande au fournisseur → réception (entrée en stock) → facture fournisseur → paiement.</p>'}
+  <p class="small muted">Seuils dans Réglages › Société : approbation par le gérant à partir de ${seuil1()?money(seuil1()):'— (non fixé : le comptable peut tout approuver)'} ; double validation des paiements à partir de ${seuil2()?money(seuil2()):'— (non activée)'}. Personne n'approuve sa propre demande, sauf le gérant.</p>`;
+}
+function poRow(l={}){const its=live(D.items).filter(i=>i.actif!==false&&STK[i.cat]&&STK[i.cat].ach);return `<tr><td><select name="item" style="min-width:120px"><option value="">Hors stock</option>${its.map(i=>`<option value="${esc(i.id)}" ${i.id===l.item?'selected':''}>${esc(i.nom)}</option>`).join('')}</select></td><td><input name="des" value="${esc(l.des||'')}" maxlength="120" style="min-width:150px"></td><td><input type="number" name="q" step="any" min="0" value="${esc(l.q||'')}" style="width:70px"></td><td><input type="number" name="pu" step="0.01" min="0" value="${esc(l.pu||'')}" style="width:110px"></td></tr>`}
+function poForm(id){const p=id?byId('pos',id):{id:'',fourn:'',act:UI.lastAct||live(D.acts)[0]?.id,proj:'',date:today(),motif:'',lignes:[{},{},{}],note:''};
+  const prj=live(D.projects).filter(x=>!['Clôturé','Terminé','Annulé'].includes(x.statut));
+  openSheet(`<h2>${id?'Modifier la demande '+esc(p.num):'Demande d\'achat'}</h2><form id="fpo" data-id="${esc(p.id)}">
+  <div class="row2"><label class="f">Fournisseur proposé<select name="fourn" data-tt="F" required>${optTiers('F',p.fourn)}</select></label><label class="f">Date<input type="date" name="date" value="${esc(p.date)}" required></label></div>
+  <div class="row2"><label class="f">Activité<select name="act">${optActs(p.act)}</select></label><label class="f">Chantier ou projet (facultatif)<select name="proj"><option value="">—</option>${prj.map(x=>`<option value="${esc(x.id)}" ${x.id===p.proj?'selected':''}>${esc(x.nom)}</option>`).join('')}</select></label></div>
+  <label class="f">Motif de l'achat<input name="motif" value="${esc(p.motif)}" required maxlength="160" placeholder="Réassort aliment poulets, matériel chantier Clinique Espoir…"></label>
+  <div class="scroll"><table><thead><tr><th>Article</th><th>Désignation</th><th>Qté</th><th>Prix unitaire (${BASE()})</th></tr></thead><tbody id="pol">${(p.lignes.length?p.lignes:[{}]).map(poRow).join('')}</tbody></table></div>
+  <div class="btns"><button type="button" class="ghost" data-act="poLine">+ Ligne</button></div>
+  <div class="balbar"><span>Total</span><span id="potot">${money(p.total||0)}</span></div>
+  <label class="f">Note<textarea name="note" maxlength="500">${esc(p.note||'')}</textarea></label>
+  <div class="btns"><button class="pr" type="submit">Envoyer pour approbation</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`);poCalc()}
+function poLines(){return $$('#pol tr').map(tr=>({item:tr.querySelector('[name=item]').value,des:tr.querySelector('[name=des]').value.trim(),q:+tr.querySelector('[name=q]').value||0,pu:r2(+tr.querySelector('[name=pu]').value||0)})).filter(l=>l.q>0&&(l.des||l.item))}
+function poCalc(){if($('#potot'))$('#potot').textContent=money(r2(poLines().reduce((s,l)=>s+l.q*l.pu,0)))}
+async function savePo(f,F){const lg=poLines().map(l=>({...l,des:(l.des||(byId('items',l.item)||{}).nom||'').slice(0,120)}));if(!lg.length)throw new Error('Ajoutez au moins une ligne avec une quantité');if(!F.fourn||F.fourn==='__new')throw new Error('Choisissez le fournisseur');
+  const id=f.dataset.id,p=id?JSON.parse(JSON.stringify(byId('pos',id))):{id:uid(),num:poNum('DA'),dem:ME,statut:'Demande',bc:'',apb:'',apd:'',rej:'',cdate:'',rdate:'',rby:'',fnum:'',fdate:'',entryId:''};
+  Object.assign(p,{fourn:F.fourn,date:F.date,act:F.act,proj:F.proj||'',motif:F.motif.slice(0,160),lignes:lg,total:r2(lg.reduce((s,l)=>s+l.q*l.pu,0)),note:(F.note||'').slice(0,500)});
+  await commit('pos',p,id?'modification demande d\'achat':'demande d\'achat',p.num+' '+money(p.total));closeSheet();render();toast(poBig(p)?'Demande envoyée : approbation du gérant requise':'Demande envoyée pour approbation')}
+function poView(id){const p=byId('pos',id),adm=isAdmin(),ach=perm('achats')||adm;const e=p.entryId&&byId('entries',p.entryId);
+  const H=[[p.date,'Demandée par '+userNom(p.dem)],p.apd&&[p.apd,(p.statut==='Rejetée'?'Rejetée':'Approuvée')+' par '+userNom(p.apb)+(p.rej?' — '+p.rej:'')],p.cdate&&[p.cdate,'Bon de commande '+p.bc+' émis'],p.rdate&&[p.rdate,'Reçue par '+userNom(p.rby)],p.fdate&&[p.fdate,'Facture fournisseur '+(p.fnum||'')+' enregistrée'+(e&&e.st==='B'?' (brouillon)':'')]].filter(Boolean);
+  openSheet(`<h2>${esc(p.bc||p.num)} <span class="tag ${POTAG[p.statut]||''}">${esc(p.statut)}</span></h2><p class="small muted">${esc(tiersNom(p.fourn))} · ${esc(actNom(p.act))}${p.proj?' · '+esc((byId('projects',p.proj)||{}).nom||''):''} · ${esc(p.motif)}</p>
+  <div class="scroll"><table><thead><tr><th>Désignation</th><th class="n">Qté</th><th class="n">P.U.</th><th class="n">Montant</th></tr></thead><tbody>${p.lignes.map(l=>`<tr><td>${esc(l.des)}${l.item?' <span class="small muted">(stock)</span>':''}</td><td class="n">${fmtQ(l.q)}</td><td class="n">${fmt(l.pu)}</td><td class="n">${fmt(r2(l.q*l.pu))}</td></tr>`).join('')}<tr class="tot"><td>Total</td><td></td><td></td><td class="n">${fmt(p.total)}</td></tr></tbody></table></div>
+  ${p.note?`<p class="small">${esc(p.note)}</p>`:''}<h3>Suivi</h3><ul class="small">${H.map(([d,t])=>`<li>${dfr(d)} — ${esc(t)}</li>`).join('')}</ul>
+  ${p.statut==='Demande'&&poBig(p)?`<p class="small muted">Montant au-delà du seuil de ${money(seuil1())} : seul le gérant peut approuver.</p>`:''}
+  <div class="btns">${canApprove(p)?`<button class="pr" data-act="poApprove" data-id="${esc(id)}">Approuver</button><button class="dg" data-act="poReject" data-id="${esc(id)}">Rejeter</button>`:''}
+  ${p.statut==='Demande'&&(p.dem===ME||adm)?`<button class="ghost" data-act="poForm" data-id="${esc(id)}">Modifier</button><button class="ghost" data-act="poCancel" data-id="${esc(id)}">Annuler la demande</button>`:''}
+  ${p.statut==='Approuvée'&&ach?`<button class="pr" data-act="poOrder" data-id="${esc(id)}">Émettre le bon de commande</button>`:''}
+  ${['Commandée','Reçue','Facturée'].includes(p.statut)?`<button class="ghost" data-act="poPrint" data-id="${esc(id)}">Imprimer le bon de commande</button>`:''}
+  ${p.statut==='Commandée'&&(ach||perm('stocks'))?`<button class="pr" data-act="poReceive" data-id="${esc(id)}">Réceptionner</button>`:''}
+  ${['Commandée','Reçue'].includes(p.statut)&&adm?`<button ${p.statut==='Reçue'?'class="pr"':''} data-act="poInvoice" data-id="${esc(id)}">Enregistrer la facture fournisseur</button>`:''}
+  ${['Approuvée','Commandée'].includes(p.statut)&&adm?`<button class="dg" data-act="poCancel" data-id="${esc(id)}">Annuler</button>`:''}
+  ${p.statut==='Facturée'&&adm?`<button data-act="quick" data-k="payfour">Payer le fournisseur</button>`:''}
+  <button class="ghost" data-act="close">Fermer</button></div>`)}
+async function poStep(id,ch,action){const p=JSON.parse(JSON.stringify(byId('pos',id)));Object.assign(p,ch);await commit('pos',p,action,(p.bc||p.num)+' → '+p.statut);return p}
+function poInvoiceForm(id){const p=byId('pos',id),hs=p.lignes.filter(l=>!l.item);
+  openSheet(`<h2>Facture fournisseur</h2><p class="small muted">${esc(p.bc||p.num)} · ${esc(tiersNom(p.fourn))} · total commandé ${money(p.total)}</p><form id="fpoinv" data-id="${esc(id)}">
+  <div class="row2"><label class="f">Date de la facture<input type="date" name="date" value="${today()}" required></label><label class="f">N° de la facture du fournisseur<input name="fnum" required maxlength="40"></label></div>
+  ${hs.length?`<label class="f">Compte de charge des lignes hors stock<select name="acc">${optAcc(['60','61','62','63','64','65','2'],'605')}</select></label>`:''}
+  <p class="small muted">L'écriture passe l'achat au débit (compte d'achat du stock pour les articles, compte choisi pour le reste) et la dette au crédit du 401 de ce fournisseur. Le paiement se fait ensuite par « Paiement fournisseur » ; au-delà du seuil, il demande deux validations.</p>
+  <div class="btns"><button class="pr" type="submit">Comptabiliser la facture</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function savePoInv(f,F){const p=byId('pos',f.dataset.id),by={};
+  for(const l of p.lignes){const it=l.item&&byId('items',l.item),c=it?STK[it.cat].ach:(F.acc||'605');by[c]=r2((by[c]||0)+l.q*l.pu)}
+  const lines=[...Object.entries(by).map(([c,v])=>({c,d:v,k:0,t:''})),{c:'401',d:0,k:p.total,t:p.fourn}];
+  const e={id:uid(),date:F.date,jr:'AC',piece:F.fnum.slice(0,40),lib:('Facture '+F.fnum+' '+tiersNom(p.fourn)+' — '+(p.bc||p.num)).slice(0,200),act:p.act,proj:p.proj||'',lines,src:{type:'achat',ref:p.id},st:isAdmin()?'V':'B'};
+  await commit('entries',e,'facture fournisseur',e.lib);await poStep(p.id,{statut:'Facturée',fnum:F.fnum.slice(0,40),fdate:F.date,entryId:e.id},'facture fournisseur');closeSheet();render();toast('Facture fournisseur comptabilisée')}
+function poHTML(p){const S=D.settings,f=byId('tiers',p.fourn)||{};
+  return `<div class="doc"><div class="hd"><div>${S.logo&&RX.img.test(S.logo)?`<img src="${S.logo}" alt=""><br>`:''}<h1>${esc(S.nom)}</h1><div>${esc(S.adresse)}</div><div>${[S.tel&&'Tél. '+S.tel,S.email].filter(Boolean).map(esc).join(' · ')}</div></div><div style="text-align:right"><h1>BON DE COMMANDE</h1><div><b>${esc(p.bc)}</b></div><div>du ${dfr(p.cdate||today())}</div></div></div>
+  <div class="meta"><div class="box"><b>Fournisseur</b><br>${esc(f.nom||'')}<br>${esc(f.adresse||'')}${f.tel?'<br>Tél. '+esc(f.tel):''}${f.nif?'<br>NIF '+esc(f.nif):''}</div><div class="box"><b>Livraison</b><br>${esc(S.nom)}<br>${esc(S.adresse)}<br>Objet : ${esc(p.motif)}</div></div>
+  <table><thead><tr><th>Désignation</th><th style="text-align:right">Quantité</th><th style="text-align:right">Prix unitaire</th><th style="text-align:right">Montant</th></tr></thead><tbody>${p.lignes.map(l=>`<tr><td>${esc(l.des)}</td><td style="text-align:right">${fmtQ(l.q)}</td><td style="text-align:right">${fmt(l.pu)}</td><td style="text-align:right">${fmt(r2(l.q*l.pu))}</td></tr>`).join('')}<tr><td colspan="3" style="text-align:right"><b>Total (${BASE()})</b></td><td style="text-align:right"><b>${fmt(p.total)}</b></td></tr></tbody></table>
+  <p>Arrêté le présent bon de commande à la somme de <b>${esc(montantLettres(p.total,BASE()))}</b>.</p><p style="font-size:11px">Merci de rappeler le numéro ${esc(p.bc)} sur votre bon de livraison et votre facture. Toute livraison non conforme à ce bon sera refusée.</p>
+  <div class="sig">Approuvé par ${esc(userNom(p.apb))} le ${dfr(p.apd)}<br>${S.signature&&RX.img.test(S.signature)?`<img src="${S.signature}" alt="">`:'<br><br>'}</div>
+  <div class="foot">${esc(S.nom)} · ${esc(S.adresse)}${S.rccm?' · RCCM '+esc(S.rccm):''}${S.idnat?' · Id. Nat. '+esc(S.idnat):''}${S.nif?' · NIF '+esc(S.nif):''}</div></div>`}
+/* ============ PAIE : BARÈME IPR ============ */
+/* Barème annuel de l'IPR (RDC), appliqué au douzième ; impôt plafonné à 30 % du revenu imposable ; réduction pour charges de famille réglable. */
+const IPRB=[[1944000,3],[21600000,15],[43200000,30],[Infinity,40]];
+function iprCalc(bi,cnssS,cur,pac){const rate=cur==='USD'?RATE():1,base=Math.max(0,(bi-cnssS)*rate);let t=0,prev=0;
+  for(const [lim,tx] of IPRB){const m=lim/12;if(base>prev){t+=(Math.min(base,m)-prev)*tx/100}prev=m;if(base<=m)break}
+  const fam=Math.min(+pac||0,+(D.settings.iprFamMax??9))*(+(D.settings.iprFam??2))/100;t=t*(1-Math.min(1,fam));t=Math.min(t,base*0.30);
+  return r2(t/rate)}
+/* ============ ACTIVITÉ : PISCICULTURE ============ */
+const ESPECES=['Tilapia','Clarias (poisson-chat)','Carpe','Autre'];
+const PIOPS={A:'Aliment',M:'Mortalité',P:'Pêche de contrôle (poids moyen)',R:'Récolte et vente',D:'Autre dépense'};
+const PIACC={A:'602',D:'638'};
+function pisAct(){return (live(D.acts).find(a=>/pisci|poisson/i.test(a.nom))||{}).id}
+function lotStats(l){const ops=live(D.pisops).filter(o=>o.lot===l.id).sort((a,b)=>a.date.localeCompare(b.date));let mort=0,nr=0,kgr=0,ca=0,alim=0,ca_=0,dep=0,pm=+l.pmi||0,pd=l.date;const pes=[[0,pm]],byDay={};
+  for(const o of ops){if(o.type==='M'){mort+=+o.qte||0;byDay[o.date]=(byDay[o.date]||0)+(+o.qte||0)}else if(o.type==='R'){nr+=+o.qte||0;kgr+=+o.kg||0;ca+=+o.montant||0}else if(o.type==='A'){alim+=+o.kg||0;ca_+=+o.cout||0}else if(o.type==='D')dep+=+o.cout||0;else if(o.type==='P'){pm=+o.g||0;pd=o.date;pes.push([dd(l.date,o.date),pm])}}
+  const init=+l.nb||0,eff=Math.max(0,init-mort-nr),age=dd(l.date,l.statut==='Clôturé'&&l.fin?l.fin:today()),bio=eff*pm/1000,gain=Math.max(0,bio+kgr-init*(+l.pmi||0)/1000);
+  const cost=r2(init*(+l.pu||0)+ca_+dep),lastM=Object.entries(byDay).sort().at(-1);
+  return {ops,init,mort,nr,kgr,ca:r2(ca),alim,calim:r2(ca_),dep:r2(dep),eff,age,pm,pd,pes,bio,gain,ic:gain>0?alim/gain:0,surv:init?(init-mort)/init*100:0,cost,ckg:(kgr+bio)>0?cost/(kgr+bio):0,marge:r2(ca-cost),lastM,dens:+l.surface?eff/+l.surface:0}}
+function pisView(){const ls=live(D.lots).sort((a,b)=>b.date.localeCompare(a.date)),can=perm('pisci'),act=ls.filter(l=>l.statut!=='Clôturé');
+  let eff=0,bio=0,ca=0,cost=0,alim=0,gain=0,init=0,mort=0;for(const l of ls){const s=lotStats(l);if(l.statut!=='Clôturé'){eff+=s.eff;bio+=s.bio}ca+=s.ca;cost+=s.cost;alim+=s.alim;gain+=s.gain;init+=s.init;mort+=s.mort}
+  return `<div class="kpis"><div class="kpi"><div class="l">Lots en cours</div><div class="v">${act.length}</div></div><div class="kpi"><div class="l">Poissons vivants (estim.)</div><div class="v">${fmtQ(eff)}</div></div>
+  <div class="kpi"><div class="l">Biomasse estimée</div><div class="v">${fmt(bio)} kg</div></div><div class="kpi"><div class="l">Taux de survie</div><div class="v">${init?fmt((init-mort)/init*100):'—'} %</div></div>
+  <div class="kpi"><div class="l">Indice de conversion</div><div class="v">${gain?fmt(alim/gain):'—'}</div></div><div class="kpi"><div class="l">Marge (ventes − coûts)</div><div class="v ${ca-cost<0?'neg':''}">${money(ca-cost)}</div></div></div>
+  ${can?`<div class="btns"><button class="pr" data-act="lotForm">+ Nouveau lot</button>${act.length?'<button data-act="piop" data-k="A">+ Aliment</button><button data-act="piop" data-k="M">+ Mortalité</button><button data-act="piop" data-k="P">+ Pêche de contrôle</button><button data-act="piop" data-k="R">+ Récolte</button>':''}</div>`:''}
+  ${ls.length?ls.map(l=>{const s=lotStats(l);return `<div class="card" data-act="openLot" data-id="${esc(l.id)}" style="cursor:pointer"><div class="top"><b>${esc(l.nom)}</b><span class="tag ${l.statut==='Clôturé'?'':'g'}">${esc(l.statut)}</span></div>
+   <div class="small muted">${esc(l.espece)} · bassin ${esc(l.bassin||'—')} · ensemencé le ${dfr(l.date)} · ${s.age} jours</div>
+   <div class="small">Vivants <b>${fmtQ(s.eff)}</b> · survie <b class="${s.surv<85?'neg':''}">${fmt(s.surv)} %</b> · poids moyen <b>${fmtQ(s.pm)} g</b> (objectif ${fmtQ(l.obj||0)} g) · biomasse <b>${fmt(s.bio)} kg</b> · IC <b>${s.ic?fmt(s.ic):'—'}</b></div>
+   <div class="prog" style="margin-top:6px"><i style="width:${Math.min(100,l.obj?s.pm/l.obj*100:0)}%"></i></div></div>`}).join(''):'<p class="empty">Créez un lot pour chaque mise en charge d\'un bassin : espèce, nombre d\'alevins, poids moyen de départ. Suivez ensuite l\'aliment, la mortalité, les pêches de contrôle et la récolte : l\'app calcule la survie, la biomasse, l\'indice de conversion et le coût du kilo.</p>'}`}
+function lotForm(id){const l=id?byId('lots',id):{id:'',nom:'Lot '+(live(D.lots).length+1),bassin:'',espece:'Tilapia',date:today(),nb:'',pmi:5,pu:'',surface:'',duree:180,obj:400,statut:'En cours'};
+  openSheet(`<h2>${id?'Modifier le lot':'Nouveau lot de poissons'}</h2><form id="flot" data-id="${esc(l.id)}">
+  <div class="row2"><label class="f">Nom du lot<input name="nom" value="${esc(l.nom)}" required maxlength="60"></label><label class="f">Bassin ou étang<input name="bassin" value="${esc(l.bassin)}" maxlength="60" placeholder="Étang 1"></label></div>
+  <div class="row2"><label class="f">Espèce<select name="espece">${ESPECES.map(x=>`<option ${x===l.espece?'selected':''}>${x}</option>`).join('')}</select></label><label class="f">Date d'ensemencement<input type="date" name="date" value="${esc(l.date)}" required></label></div>
+  <div class="row2"><label class="f">Nombre d'alevins<input type="number" name="nb" step="1" min="1" value="${esc(l.nb)}" required></label><label class="f">Poids moyen de départ (g)<input type="number" name="pmi" step="0.1" min="0" value="${esc(l.pmi)}"></label></div>
+  <div class="row2"><label class="f">Prix d'un alevin (${BASE()})<input type="number" name="pu" step="0.01" min="0" value="${esc(l.pu)}"></label><label class="f">Surface en eau (m²)<input type="number" name="surface" step="1" min="0" value="${esc(l.surface)}"></label></div>
+  <div class="row2"><label class="f">Durée prévue (jours)<input type="number" name="duree" step="1" min="30" value="${esc(l.duree)}"></label><label class="f">Poids de récolte visé (g)<input type="number" name="obj" step="1" min="1" value="${esc(l.obj)}"></label></div>
+  ${id?`<label class="f">Statut<select name="statut">${['En cours','Clôturé'].map(x=>`<option ${x===l.statut?'selected':''}>${x}</option>`).join('')}</select></label>`:`<label class="f">Achat des alevins en comptabilité<select name="pay"><option value="">Non</option>${TRESO.filter(t=>t[2]===BASE()).map(([c,lb])=>`<option value="${c}">Oui — payé par ${lb}</option>`).join('')}</select></label>`}
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveLot(f,F){const id=f.dataset.id;let act=pisAct();
+  if(!act&&isAdmin()){act='act_pisci';if(!byId('acts',act))await commit('acts',{id:act,nom:'Pisciculture'},'nouvelle activité','Pisciculture')}if(!act)act=farmAct();
+  const l=id?JSON.parse(JSON.stringify(byId('lots',id))):{id:uid(),act,statut:'En cours'};
+  Object.assign(l,{nom:F.nom.slice(0,60),bassin:(F.bassin||'').slice(0,60),espece:F.espece,date:F.date,nb:Math.max(1,Math.round(+F.nb||0)),pmi:Math.max(0,+F.pmi||0),pu:r2(Math.max(0,+F.pu||0)),surface:Math.max(0,+F.surface||0),duree:Math.max(30,Math.round(+F.duree||180)),obj:Math.max(1,+F.obj||400)});
+  if(id&&F.statut){l.statut=F.statut;if(F.statut==='Clôturé'&&!l.fin)l.fin=today()}
+  if(!id&&F.pay&&l.nb*l.pu>0){const amt=r2(l.nb*l.pu),cur=TR(F.pay)[2];const e={id:uid(),date:l.date,jr:TR(F.pay)[3],piece:'PISC',lib:('Alevins '+l.nom).slice(0,200),act:l.act,lines:[{c:'602',d:amt,k:0,t:''},{c:F.pay,d:0,k:amt,t:'',fx:{cur,a:amt}}],src:{type:'pisci',ref:l.id},st:isAdmin()?'V':'B'};await commit('entries',e,'saisie',e.lib);l.entryId=e.id}
+  await commit('lots',l,id?'modification lot':'nouveau lot',l.nom);closeSheet();sub.lid=l.id;go('lot')}
+function piopForm(type,lid){const ls=live(D.lots).filter(l=>l.statut!=='Clôturé'||l.id===lid);if(!ls.length)return toast('Créez d\'abord un lot');
+  openSheet(`<h2>${esc(PIOPS[type])}</h2><form id="fpiop" data-k="${type}">
+  <div class="row2"><label class="f">Lot<select name="lot">${ls.map(l=>`<option value="${esc(l.id)}" ${l.id===lid?'selected':''}>${esc(l.nom)} (${esc(l.bassin||'')})</option>`).join('')}</select></label><label class="f">Date<input type="date" name="date" value="${today()}" required></label></div>
+  ${type==='M'||type==='R'?`<label class="f">Nombre de poissons<input type="number" name="qte" step="1" min="1" required inputmode="numeric"></label>`:''}
+  ${type==='A'||type==='R'?`<label class="f">${type==='A'?'Kilos d\'aliment':'Kilos récoltés'}<input type="number" name="kg" step="0.1" min="0.1" required inputmode="decimal"></label>`:''}
+  ${type==='P'?`<label class="f">Poids moyen de l'échantillon (g)<input type="number" name="g" step="0.1" min="0.1" required inputmode="decimal"></label>`:''}
+  ${type==='R'?`<div class="row2"><label class="f">Prix au kilo (${BASE()})<input type="number" name="pk" step="0.01" min="0"></label><label class="f">ou montant total<input type="number" name="montant" step="0.01" min="0"></label></div>`:''}
+  ${type==='A'||type==='D'?`<label class="f">Coût (${BASE()})<input type="number" name="cout" step="0.01" min="0" ${type==='D'?'required':''}></label>`:''}
+  <label class="f">Note<input name="lib" maxlength="120"></label>
+  ${type!=='M'&&type!=='P'?`<label class="f">Enregistrer aussi en comptabilité<select name="pay"><option value="">Non</option>${TRESO.filter(t=>t[2]===BASE()).map(([c,lb])=>`<option value="${c}">Oui — ${lb}</option>`).join('')}</select></label>`:''}
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function savePiop(type,F){const l=byId('lots',F.lot),s=lotStats(l);
+  const o={id:uid(),lot:l.id,type,date:F.date,lib:(F.lib||'').slice(0,120),qte:Math.max(0,Math.round(+F.qte||0)),kg:Math.max(0,+F.kg||0),g:Math.max(0,+F.g||0),cout:r2(Math.max(0,+F.cout||0)),montant:0};
+  if(F.date<l.date)throw new Error('Date avant l\'ensemencement');
+  if((type==='M'||type==='R')&&!(o.qte>0))throw new Error('Nombre invalide');if((type==='M'||type==='R')&&o.qte>s.eff)throw new Error('Plus que les poissons vivants ('+fmtQ(s.eff)+')');
+  if(type==='R'){o.montant=r2(+F.montant||(+F.pk||0)*o.kg)}
+  const amt=type==='R'?o.montant:o.cout;
+  if(F.pay&&amt>0){const acc=type==='R'?'702':PIACC[type],cur=TR(F.pay)[2],lib=(type==='R'?'Vente poissons ':PIOPS[type]+' ')+l.nom;
+    const lines=type==='R'?[{c:F.pay,d:amt,k:0,t:'',fx:{cur,a:amt}},{c:acc,d:0,k:amt,t:''}]:[{c:acc,d:amt,k:0,t:''},{c:F.pay,d:0,k:amt,t:'',fx:{cur,a:amt}}];
+    const e={id:uid(),date:o.date,jr:TR(F.pay)[3],piece:'PISC',lib:lib.slice(0,200),act:l.act,lines,src:{type:'pisci',ref:o.id},st:isAdmin()?'V':'B'};await commit('entries',e,'saisie',e.lib);o.entryId=e.id}
+  await commit('pisops',o,'pisciculture',PIOPS[type]+' '+l.nom);
+  if(lotStats(l).eff===0&&l.statut!=='Clôturé'){const c=JSON.parse(JSON.stringify(l));c.statut='Clôturé';c.fin=o.date;await commit('lots',c,'lot clôturé',l.nom)}
+  closeSheet();render();toast(type==='M'&&s.init&&o.qte/s.init>0.02?'Mortalité élevée (plus de 2 %) : contrôlez l\'eau (oxygène, température) et l\'alimentation':'Enregistré')}
+function lotView(){const l=byId('lots',sub.lid),back='<button class="ghost" data-go="activites" data-sub3="pisci" style="margin-bottom:10px">← Pisciculture</button>';if(!l||l.del)return back+'<p class="empty">Lot introuvable.</p>';
+  const s=lotStats(l),can=perm('pisci'),W2=320,H2=170,mxD=Math.max(l.duree||180,s.age,...s.pes.map(p=>p[0])),mxG=Math.max(l.obj||1,...s.pes.map(p=>p[1]))*1.1,X=d=>30+d/mxD*(W2-40),Y=g=>H2-20-g/mxG*(H2-30);
+  const curve=`<svg viewBox="0 0 ${W2} ${H2}" style="width:100%;max-width:560px;height:auto"><line x1="30" y1="${H2-20}" x2="${W2-10}" y2="${H2-20}" stroke="var(--ln)"/><line x1="${X(0)}" y1="${Y(+l.pmi||0)}" x2="${X(l.duree||180)}" y2="${Y(l.obj||0)}" stroke="#e0a800" stroke-width="2" stroke-dasharray="5 4"/><polyline fill="none" stroke="var(--ink)" stroke-width="2.5" points="${s.pes.map(p=>X(p[0])+','+Y(p[1])).join(' ')}"/>${s.pes.map(p=>`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="3.5" fill="var(--ink)"/>`).join('')}<text x="30" y="12" font-size="11" fill="var(--sl)">${fmtQ(Math.round(mxG))} g</text><text x="${W2-10}" y="${H2-5}" font-size="11" fill="var(--sl)" text-anchor="end">${mxD} j</text></svg><div class="legend"><span><i style="background:var(--ink)"></i>Poids moyen mesuré</span><span><i style="background:#e0a800"></i>Trajectoire visée</span></div>`;
+  return back+`<h2>${esc(l.nom)}</h2><p class="small muted">${esc(l.espece)} · bassin ${esc(l.bassin||'—')} · ${fmtQ(l.nb)} alevins de ${fmtQ(l.pmi)} g le ${dfr(l.date)} · ${s.age} jours sur ${l.duree} prévus${s.dens?' · densité '+fmt(s.dens)+' poissons/m²':''}</p>
+  <div class="kpis"><div class="kpi"><div class="l">Vivants (estim.)</div><div class="v">${fmtQ(s.eff)}</div></div><div class="kpi"><div class="l">Survie</div><div class="v ${s.surv<85?'neg':''}">${fmt(s.surv)} %</div></div><div class="kpi"><div class="l">Poids moyen</div><div class="v">${fmtQ(s.pm)} g</div></div><div class="kpi"><div class="l">Biomasse</div><div class="v">${fmt(s.bio)} kg</div></div>
+  <div class="kpi"><div class="l">Aliment distribué</div><div class="v">${fmt(s.alim)} kg</div></div><div class="kpi"><div class="l">Indice de conversion</div><div class="v">${s.ic?fmt(s.ic):'—'}</div></div><div class="kpi"><div class="l">Coût du kilo produit</div><div class="v">${s.ckg?money(s.ckg):'—'}</div></div><div class="kpi"><div class="l">Récolté</div><div class="v">${fmt(s.kgr)} kg</div><div class="small muted">${money(s.ca)}</div></div></div>
+  ${can?`<div class="btns">${Object.keys(PIOPS).map(k=>`<button data-act="piop" data-k="${k}" data-id="${esc(l.id)}">+ ${esc(PIOPS[k].split(' (')[0])}</button>`).join('')}<button class="ghost" data-act="lotForm" data-id="${esc(l.id)}">Modifier</button></div>`:''}
+  <h3>Croissance</h3>${curve}<p class="small muted">Faites une pêche de contrôle toutes les 2 à 3 semaines (peser 20 à 30 poissons) : c'est ce poids qui estime la biomasse et l'indice de conversion.</p>
+  <h3>Coûts</h3><div class="bars">${[['Alevins',r2(s.init*(+l.pu||0))],['Aliment',s.calim],['Autres dépenses',s.dep]].map(([lb,v])=>`<div class="row" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr) 120px"><div>${lb}</div><div class="tr"><div class="b c" style="width:${W(v,Math.max(1,s.cost))}"></div></div><div class="n">${money(v)}</div></div>`).join('')}</div>
+  <p>Marge : <b class="${s.marge<0?'neg':''}">${money(s.marge)}</b> (ventes ${money(s.ca)} − coûts ${money(s.cost)})</p>
+  <h3>Registre</h3>${s.ops.slice().reverse().map(o=>`<div class="card"><div class="top"><span><b>${esc(PIOPS[o.type])}</b> · ${dfr(o.date)}</span><span class="amt">${o.type==='R'?money(o.montant):o.cout?money(o.cout):''}</span></div><div class="small muted">${o.type==='M'?fmtQ(o.qte)+' poissons':o.type==='A'?fmt(o.kg)+' kg':o.type==='P'?fmtQ(o.g)+' g':o.type==='R'?fmtQ(o.qte)+' poissons · '+fmt(o.kg)+' kg':''}${o.lib?' · '+esc(o.lib):''}</div>${isAdmin()||o.cr===ME?`<button class="dg" style="margin-top:6px" data-act="delPiop" data-id="${esc(o.id)}">Supprimer</button>`:''}</div>`).join('')||'<p class="muted">Aucune opération.</p>'}`}
 
 /* ============ PROJETS, TÂCHES ET GANTT ============ */
 const PSTAT=['Prévu','En cours','Suspendu','Terminé'];
@@ -2107,7 +2302,7 @@ document.addEventListener('click',ev=>{
     saveDraft:async()=>{const f=$('#fm');await saveManual(f,Object.fromEntries(new FormData(f)),'B')},
     editEntry:()=>{const e=byId('entries',id);if(e.src?.type==='quick'&&e.src.k&&false)return;manualForm(JSON.parse(JSON.stringify(e)))},
     delEntry:async()=>{if(!ask('Supprimer ce brouillon ?'))return;const e=JSON.parse(JSON.stringify(byId('entries',id)));e.del=true;await commit('entries',e,'suppression brouillon',e.lib);render()},
-    validate:async()=>{const e=JSON.parse(JSON.stringify(byId('entries',id)));e.st='V';await commit('entries',e,'validation',e.lib);render();toast('Écriture validée')},
+    validate:async()=>{const e=JSON.parse(JSON.stringify(byId('entries',id)));e.st='V';await commit('entries',e,'validation',e.lib);render();if(byId('entries',id).st==='V')toast('Écriture validée')},
     validateAll:async()=>{const ds=live(D.entries).filter(e=>e.st==='B');if(!ask('Valider '+ds.length+' brouillon(s) ?'))return;let n=0;for(const x of ds){try{const e=JSON.parse(JSON.stringify(x));e.st='V';await commit('entries',e,'validation',e.lib);n++}catch(er){}}render();toast(n+' écriture(s) validée(s)')},
     reverse:async()=>{const w=window.prompt('Motif de la contrepassation (obligatoire)');if(!w||!w.trim())return;await reverse(id,w.trim());render();toast('Contrepassation enregistrée')},
     doc:()=>docForm(k),openDoc:()=>docView(id),editDoc:()=>docForm(null,id),convDoc:()=>docForm('F',null,{fromDevis:id}),avoir:()=>docForm('A',null,{avoirOf:id}),
@@ -2139,6 +2334,19 @@ document.addEventListener('click',ev=>{
     bande:()=>bandeForm(id),openBande:()=>bandeView(id),pop:()=>popForm(k||'',b.dataset.c||''),
     delPop:async()=>{if(!ask('Supprimer cette opération ? Son écriture comptable éventuelle n\'est pas supprimée.'))return;const o=JSON.parse(JSON.stringify(byId('pouops',id)));o.del=true;await commit('pouops',o,'suppression opération élevage','');render();bandeView(o.bande)},
     chantier:()=>{if(k)sub.chm=k;chantierForm(id)},
+    poForm:()=>poForm(id),openPo:()=>poView(id),poLine:()=>$('#pol').insertAdjacentHTML('beforeend',poRow()),
+    poApprove:async()=>{{const x=byId('pos',id);await commit('aprs',{id:uid(),e:id,u:ME,h:phash(x),date:today()},'approbation achat',x.num)}const p=await poStep(id,{statut:'Approuvée',apb:ME,apd:today()},'approbation achat');poView(p.id);render();toast('Demande approuvée')},
+    poReject:async()=>{const m=(window.prompt('Motif du rejet')||'').trim();if(!m)return;await poStep(id,{statut:'Rejetée',apb:ME,apd:today(),rej:m.slice(0,160)},'rejet achat');closeSheet();render();toast('Demande rejetée')},
+    poCancel:async()=>{if(!ask('Annuler cette demande ou commande ?'))return;await poStep(id,{statut:'Annulée'},'annulation achat');closeSheet();render()},
+    poOrder:async()=>{const p=await poStep(id,{statut:'Commandée',bc:poNum('BC'),cdate:today()},'bon de commande');render();poView(p.id);doPrint(poHTML(p))},
+    poPrint:()=>doPrint(poHTML(byId('pos',id))),
+    poReceive:async()=>{const p=byId('pos',id),st=p.lignes.filter(l=>l.item);if(!ask('Confirmer la réception complète de '+(p.bc||p.num)+' ?'+(st.length?' '+st.length+' article(s) entreront en stock.':'')))return;
+      if(st.length&&!perm('stocks'))return toast('Droit « stocks » requis pour l\'entrée en stock');
+      for(const l of st){const it=byId('items',l.item);await commit('moves',{id:uid(),date:today(),item:l.item,type:'E',q:+l.q,pu:+l.pu,motif:'Réception '+(p.bc||p.num),po:p.id,entryId:'',st:'V'},'réception achat',it.nom+' '+l.q)}
+      await poStep(id,{statut:'Reçue',rdate:today(),rby:ME},'réception achat');poView(id);render();toast('Réception enregistrée')},
+    poInvoice:()=>poInvoiceForm(id),
+    lotForm:()=>lotForm(id),openLot:()=>{sub.lid=id;go('lot')},piop:()=>piopForm(k,id||sub.lid),
+    delPiop:async()=>{if(!ask('Supprimer cette opération ? Son écriture comptable éventuelle n\'est pas supprimée.'))return;const o=JSON.parse(JSON.stringify(byId('pisops',id)));o.del=true;await commit('pisops',o,'suppression',PIOPS[o.type]);render()},
     tdbM:()=>{sub.tp='m';sub.tm=b.dataset.v;render()},tdbA:()=>{sub.ta=sub.ta===b.dataset.v?'':b.dataset.v;render()},drill:()=>drill(b.dataset.v),
     budForm:()=>budForm(b.dataset.v),objForm:()=>objForm(id),
     budSplit:()=>{const p=+$('#bpt').value||0,c=+$('#bct').value||0;for(let i=0;i<12;i++){if(p)$('#fbud [name=p'+i+']').value=r2(p/12);if(c)$('#fbud [name=c'+i+']').value=r2(c/12)}},
@@ -2178,6 +2386,7 @@ document.addEventListener('input',e=>{
   const t=e.target;
   if(t.closest('#fm'))mCheck();
   if(t.closest('#fd'))dCalc();
+  if(t.closest('#fpo'))poCalc();
   if(t.closest('#fs')){if(t.name==='emp'){const o=t.selectedOptions[0];$('#fs [name=base]').value=o.dataset.b}sCalc()}
   if(t.id==='fq2'){sub.q=t.value;const p=t.selectionStart;render();const n=$('#fq2');n.focus();n.setSelectionRange(p,p)}
   if(t.id==='jq'){sub.jq=t.value;const p=t.selectionStart;render();const n=$('#jq');n.focus();n.setSelectionRange(p,p)}
@@ -2191,6 +2400,7 @@ document.addEventListener('change',e=>{
   if(t.closest('#fq')&&['tr','tr2','cur'].includes(t.name))autoMt2();
   if(t.closest('#fd')&&t.name==='cur'){docDraft.cur=t.value;dCalc()}
   if(t.matches('#fcmd [name=client]')&&t.value&&t.value!=='__new'){const last=live(D.cmds).filter(c=>c.client===t.value&&(c.mes||[]).some(Boolean)).sort((a,b)=>b.date.localeCompare(a.date))[0];if(last){MES.forEach((_,i)=>{const el=$('#fcmd [name=m'+i+']');if(el&&!el.value)el.value=last.mes[i]||''});toast('Mesures reprises de la commande '+last.num)}}
+  if(t.matches('#pol [name=item]')&&t.value){const tr=t.closest('tr'),it=byId('items',t.value),d=tr.querySelector('[name=des]'),pu=tr.querySelector('[name=pu]');if(!d.value)d.value=it.nom;if(!pu.value){const c=stockOf(it).cmup;if(c)pu.value=r2(c)}poCalc()}
   if(t.dataset.subk&&(t.value||t.type!=='month')){sub[t.dataset.subk]=t.value;render()}
   if(t.id==='pmois'){sub.mois=t.value;render()}
   if(t.id==='jmois'){sub.jmois=t.value;render()}
@@ -2243,8 +2453,8 @@ document.addEventListener('submit',ev=>{
         const e={id:uid(),date:F.date,jr:F.pay==='401'?'AC':TR(F.pay)[3],piece:'',lib:'Achat '+fmtQ(q)+' '+it.unite+' '+it.nom,act:it.act,src:{type:'stock',ref:m.id},st:'V',lines:[{c:ach,d:mtB,k:0,t:''},line]};
         await commit('entries',e,'achat stock',e.lib);m.entryId=e.id}
       await commit('moves',m,'mouvement de stock',it.nom+' '+k+' '+q);closeSheet();render();toast('Mouvement enregistré');break}
-    case 'fe':{const id=f.dataset.id;const e=id?JSON.parse(JSON.stringify(byId('emps',id))):{id:uid()};Object.assign(e,{nom:F.nom.slice(0,120),poste:F.poste,tel:F.tel,base:r2(F.base),cur:F.cur,cnss:F.cnss,act:F.act,actif:!!F.actif});await commit('emps',e,id?'modification employé':'nouvel employé',e.nom);closeSheet();render();break}
-    case 'fs':{const id=f.dataset.id;const s=id?JSON.parse(JSON.stringify(byId('slips',id))):{id:uid(),st:'B'};const emp=byId('emps',F.emp);Object.assign(s,{mois:F.mois,emp:F.emp,cur:emp?.cur||'USD',rate:RATE(),base:r2(F.base),primes:r2(F.primes),indem:r2(F.indem),ipr:r2(F.ipr),avance:r2(F.avance)});await commit('slips',s,'bulletin brouillon',emp?.nom||'');sub.mois=s.mois;closeSheet();render();slipForm(s.id);toast('Brouillon enregistré : validez-le pour le comptabiliser');break}
+    case 'fe':{const id=f.dataset.id;const e=id?JSON.parse(JSON.stringify(byId('emps',id))):{id:uid()};Object.assign(e,{nom:F.nom.slice(0,120),poste:F.poste,tel:F.tel,base:r2(F.base),cur:F.cur,cnss:F.cnss,pac:Math.max(0,Math.round(+F.pac||0)),act:F.act,actif:!!F.actif});await commit('emps',e,id?'modification employé':'nouvel employé',e.nom);closeSheet();render();break}
+    case 'fs':{const id=f.dataset.id;const s=id?JSON.parse(JSON.stringify(byId('slips',id))):{id:uid(),st:'B'};const emp=byId('emps',F.emp);Object.assign(s,{mois:F.mois,emp:F.emp,cur:emp?.cur||'USD',rate:RATE(),base:r2(F.base),primes:r2(F.primes),indem:r2(F.indem),ipr:r2(F.ipr),iprAuto:!!F.iprAuto,avance:r2(F.avance)});await commit('slips',s,'bulletin brouillon',emp?.nom||'');sub.mois=s.mois;closeSheet();render();slipForm(s.id);toast('Brouillon enregistré : validez-le pour le comptabiliser');break}
     case 'fps':{const s=JSON.parse(JSON.stringify(byId('slips',f.dataset.id)));if(TR(F.tr)[2]!==s.cur)throw new Error('Devise du compte différente du salaire');const net=slipCalc(s).net,nB=toBase(net,s.cur,s.rate),emp=byId('emps',s.emp)||{};
       const e={id:uid(),date:F.date,jr:TR(F.tr)[3],piece:'PAIE-'+s.mois,lib:'Paiement salaire — '+emp.nom,act:emp.act||'act5',src:{type:'paiepay',ref:s.id},st:'V',lines:[{c:'422',d:nB,k:0,t:''},{c:F.tr,d:0,k:nB,t:'',fx:{cur:s.cur,a:net}}]};
       await commit('entries',e,'paiement salaire',emp.nom);s.st='P';s.paid=F.date;s.payEntry=e.id;await commit('slips',s,'salaire payé',emp.nom);closeSheet();render();toast('Salaire payé');break}
@@ -2264,6 +2474,10 @@ document.addEventListener('submit',ev=>{
     case 'fchop':await saveChop(f,F);break;
     case 'fcmd':await saveCmd(f,F);break;
     case 'fbud':await saveBud(f,F);break;
+    case 'fpo':await savePo(f,F);break;
+    case 'fpoinv':await savePoInv(f,F);break;
+    case 'flot':await saveLot(f,F);break;
+    case 'fpiop':await savePiop(f.dataset.k,F);break;
     case 'fobj':await saveObj(f,F);break;
     case 'fchmat':{const it=byId('items',F.item),q=+F.q;if(!(q>0))throw new Error('Quantité invalide');const m={id:uid(),date:F.date,item:F.item,type:'S',q,pu:0,motif:(byId('cmds',f.dataset.p)?'Commande : ':'Chantier : ')+jobById(f.dataset.p).nom,proj:f.dataset.p,entryId:'',st:'V'};if(!stockOK(m.item,[...D.moves,m]))throw new Error('Stock insuffisant à cette date');await commit('moves',m,'sortie chantier',it.nom+' '+q);closeSheet();render();toast('Matériel imputé');break}
     case 'fpop':await savePop(f.dataset.k,F);break;
@@ -2271,7 +2485,7 @@ document.addEventListener('submit',ev=>{
     case 'ftask':await saveTask(f,F);break;
     case 'frole':{const id=f.dataset.id;const r=id?JSON.parse(JSON.stringify(byId('roles',id))):{id:'r_'+uid()};r.nom=F.nom.trim().slice(0,40);if(ROLES.includes(r.nom))throw new Error('Nom réservé');r.perms={};for(const [p] of PERMS)if(F['p_'+p])r.perms[p]=true;await commit('roles',r,id?'modification rôle':'nouveau rôle',r.nom);closeSheet();render();toast('Rôle enregistré');break}
     case 'fclose':{const m=F.m;if(!ask('Clôturer définitivement jusqu\'au '+dfr(lastDay(m))+' ? Cette action est irréversible.'))return;await closePeriod(m);render();toast('Période clôturée');break}
-    case 'fset':{const s=JSON.parse(JSON.stringify(D.settings));for(const k of ['nom','adresse','rccm','idnat','nif','tel','email','mentions','annexe'])s[k]=(F[k]||'').slice(0,500);for(const k of ['taux','tva','cnssSal','cnssPat','inpp','onem'])s[k]=Math.max(0,+F[k]||0);if(!(s.taux>0))throw new Error('Taux invalide');s.tvaDefaut=!!F.tvaDefaut;await commitSettings(s,'réglages','');render();toast('Réglages enregistrés');break}
+    case 'fset':{const s=JSON.parse(JSON.stringify(D.settings));for(const k of ['nom','adresse','rccm','idnat','nif','tel','email','mentions','annexe'])s[k]=(F[k]||'').slice(0,500);for(const k of ['taux','tva','cnssSal','cnssPat','inpp','onem','iprFam','iprFamMax','seuil1','seuil2'])s[k]=Math.max(0,+F[k]||0);if(s.seuil2>0&&validators().length<2)throw new Error('La double validation exige au moins deux utilisateurs ayant le droit de valider. Ajoutez d\'abord un comptable.');if(!(s.taux>0))throw new Error('Taux invalide');s.tvaDefaut=!!F.tvaDefaut;await commitSettings(s,'réglages','');render();toast('Réglages enregistrés');break}
   }});
 });
 function exportCSV(){
