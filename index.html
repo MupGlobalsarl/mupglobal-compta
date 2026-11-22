@@ -130,6 +130,38 @@ textarea{min-height:70px}
 .pin{letter-spacing:.35em;font-size:22px;text-align:center}
 .fp{font-family:ui-monospace,Menlo,monospace;font-size:14px;background:var(--pn);padding:2px 6px;border-radius:3px;overflow-wrap:anywhere}
 #print{display:none}
+:root{--ac:#1d4f91}
+header{border-bottom:3px solid var(--ac);transition:border-color .2s}
+#app>h2{border-left:5px solid var(--ac);padding-left:10px;color:light-dark(var(--ac),var(--ink))}
+h2.sec{border-left:5px solid var(--ac);padding-left:10px;color:light-dark(var(--ac),var(--ink));margin-top:26px}
+.kpi{border-top:3px solid var(--ac)}
+button.pr{background:var(--ac);border-color:var(--ac);color:#fff}
+.seg button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+nav button.on{color:light-dark(var(--ac),#fff);box-shadow:inset 0 3px 0 var(--ac)}
+.prog i,.gbar i,.b.p{background:var(--ac)}
+.tiles button{border-left:5px solid var(--tc,var(--ln))}
+.acard{border-top:4px solid var(--tc,var(--ac))}.acard h4{color:light-dark(var(--tc,var(--ac)),var(--ink))}
+.acard[data-sub3=ferme],.seg button[data-k=act][data-v=ferme]{--tc:#2e7d32}.acard[data-sub3=poulets],.seg button[data-k=act][data-v=poulets]{--tc:#c77700}.acard[data-sub3=pisci],.seg button[data-k=act][data-v=pisci]{--tc:#0277bd}.acard[data-sub3=elec],.seg button[data-k=act][data-v=elec]{--tc:#d35400}.acard[data-sub3=couture],.seg button[data-k=act][data-v=couture]{--tc:#7b1fa2}.acard[data-go=projets],.acard[data-sub2=mine]{--tc:#3949ab}.acard[data-go=direction]{--tc:#123c69}
+.seg button[data-k=act]::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:-1px;background:var(--tc)}.seg button[data-k=act].on::before{background:#fff}
+.tdbbox{border:1px solid var(--ln);border-top:4px solid var(--ac);border-radius:6px;padding:12px;margin:18px 0;background:light-dark(#fbfcfd,#141a1f)}
+.tdbbox>h2{margin-top:2px}
+.spot{outline:3px solid #ffd84a!important;outline-offset:3px;box-shadow:0 0 0 9px rgba(255,216,74,.35)!important;animation:spot 1s ease-in-out 3;border-radius:6px}
+@keyframes spot{50%{box-shadow:0 0 0 16px rgba(255,216,74,.12)}}
+.upd-bar{position:fixed;left:0;right:0;bottom:calc(66px + env(safe-area-inset-bottom));z-index:40;padding:0 10px;animation:updin .35s ease-out}
+body.locked .upd-bar{bottom:14px}
+.upd-in{max-width:560px;margin:0 auto;background:#101418;color:#fff;border-radius:14px;border:2px solid #ffd84a;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:12px 14px}
+.upd-bar.ok .upd-in{border-color:#38c172}
+.upd-h{display:flex;gap:10px;align-items:flex-start}.upd-ic{font-size:22px;line-height:1}
+.upd-h b{display:block;font-size:16px;line-height:1.25;color:#ffd84a}.upd-bar.ok .upd-h b{color:#7ee2a8}
+.upd-h span{display:block;font-size:12px;color:#c9d1d8;margin-top:2px}
+.upd-in ul{margin:8px 0 4px;padding-left:20px;font-size:13px;line-height:1.4}.upd-in li{margin:3px 0}
+.upd-news li{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.upd-news button{flex:none;background:#ffd84a;color:#101418;border:0;font-weight:800;padding:5px 10px;min-height:32px;font-size:13px}
+.upd-b{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.upd-b button{flex:1;min-width:130px}
+.upd-b button.go{background:#ffd84a;color:#101418;border-color:#ffd84a}.upd-b button.later{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
+@keyframes updin{from{transform:translateY(30px);opacity:0}}
+@media print{.upd-bar{display:none!important}}
+@media(prefers-reduced-motion:reduce){.spot,.upd-bar{animation:none}}
 body.demo header{box-shadow:inset 0 5px 0 var(--y)}body.demo header h1 small::after{content:' · DÉMO, données fictives';color:var(--rd);font-weight:800}
 .kpis.sm .v{font-size:clamp(16px,4.6vw,22px)}
 .doc.rap h2{font-size:15px;margin:18px 0 8px;padding-bottom:3px;border-bottom:2px solid #101418;break-after:avoid}.doc.rap h3{font-size:13px;margin:12px 0 6px}.doc.rap ul{margin:0 0 6px;padding-left:18px}.doc.rap li{margin-bottom:4px}.doc.rap table{width:100%;border-collapse:collapse;break-inside:avoid}.doc.rap th{text-align:left;border-bottom:2px solid #101418;font-size:11px}.doc.rap .legend{color:#333;font-size:11px}.doc.rap svg{break-inside:avoid}
@@ -603,6 +635,7 @@ function render(){
   $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.go===NV));
   $('#who').textContent=(meU()?.nom||'?').split(' ')[0]+' · '+roleName(role());
   $('#sttl').textContent=D.settings.nom+' · '+EX()+' · tenue en '+BASE();
+  document.documentElement.style.setProperty('--ac',acFor());if(!UPD_AFTER)updAfter();
   const V={accueil,saisir,factures,stocks,paie,etats,reglages,activites,projets,projet:projetView,commande:cmdView,direction,achats,materiel,lot:lotView,plus:plusView};
   $('#app').innerHTML=(V[view]||accueil)();
 }
@@ -848,10 +881,8 @@ function accueilBody(y,R,fx,all){
   <div class="kpi"><div class="l">Clients à encaisser</div><div class="v">${money(cli)}</div></div>
   <div class="kpi"><div class="l">Fournisseurs à payer</div><div class="v">${money(four)}</div></div></div>
   <div class="btns"><button class="pr" data-act="quick" data-k="vente">+ Recette</button><button class="pr" data-act="quick" data-k="depense">+ Dépense</button><button data-act="doc" data-k="F">+ Facture</button></div>
-  <div class="grid2"><section><h3>Alertes</h3>${al.length?`<ul class="alerts">${al.map(([c,t,v])=>`<li class="${c}" data-go="${v}">${t}</li>`).join('')}</ul>`:'<p class="muted">Rien à signaler.</p>'}
-  <h3>Rentabilité par activité</h3><div class="bars">${act.map(a=>`<div class="row" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 120px"><div>${esc(a.nom)}</div><div class="tr"><div class="b ${a.r<0?'n':'p'}" style="width:${W(Math.abs(a.r),amx)}"></div></div><div class="n ${a.r<0?'neg':''}">${money(a.r)}</div></div>`).join('')}</div></section>
-  <section><h3>Produits et charges par mois</h3><div class="legend"><span><i style="background:var(--ink)"></i>Produits</span><span><i style="background:var(--sl);opacity:.55"></i>Charges</span></div>
-  <div class="bars">${rows.map(([i,p,c])=>`<div class="row"><div>${MOIS[i-1]}</div><div class="tr"><div class="b p" style="width:${W(p,mx)}"></div><div class="b c" style="width:${W(c,mx)}"></div></div><div class="n ${p-c<0?'neg':''}">${p||c?money(p-c):''}</div></div>`).join('')}</div></section></div>`;
+  <div class="tdbbox" id="tdb"><h2>Tableau de bord interactif</h2><p class="small muted" style="margin-top:-8px">Choisissez la période, l'activité et la comparaison ; touchez un mois, une activité ou une charge pour le détail. Budgets, objectifs, trésorerie prévue et rapports PDF : Plus › Direction.</p>${tdbView()}</div>
+  <h3>Alertes (${al.length})</h3>${al.length?`<ul class="alerts">${(sub.allAl?al:al.slice(0,6)).map(([c,t,v])=>`<li class="${c}" data-go="${v}">${t}</li>`).join('')}</ul>${al.length>6?`<button class="ghost" data-act="sub" data-k="allAl" data-v="${sub.allAl?'':'1'}">${sub.allAl?'Réduire':'Voir les '+al.length+' alertes'}</button>`:''}`:'<p class="muted">Rien à signaler.</p>'}`;
 }
 
 /* ============ SAISIR ============ */
@@ -1357,7 +1388,8 @@ function pilotage(){
 function plusView(){
   const T=[['direction','Direction','Tableau de bord interactif, budgets, objectifs, rapports PDF'],['achats','Achats','Demandes, approbations, bons de commande, réceptions'],['materiel','Matériel','Entretiens préventifs, réparations, carburant'],['stocks','Actifs','Stocks, immobilisations'],['paie','Paie','Employés, bulletins'],['etats','États financiers','Bilan, résultat, journal, TVA, rapprochement'],['reglages','Réglages','Synchronisation, utilisateurs, rôles, clôture, audit']];
   if(DEMO)T.push(['demoX','Quitter la démo','Revenir à ma vraie société']);else T.push(['demoO','Démonstration','Société fictive remplie d\'exemples pour comprendre chaque rubrique']);
-  return `<h2>Plus</h2><div class="tiles">${T.map(([v,l,d])=>`<button ${v==='demoX'?'data-act="demoExit"':v==='demoO'?'data-act="demoOpen"':`data-go="${v}"`}>${l}<span>${d}</span></button>`).join('')}</div>`;
+  T.unshift(['updchk','Mises à jour',`Version 4 du ${updDate(APP_BUILD)} · vérifier et voir les nouveautés`]);
+  return `<h2>Plus</h2><div class="tiles">${T.map(([v,l,d])=>`<button style="--tc:${AC[v]||'#ffd84a'}" ${v==='updchk'?'data-act="updChk"':v==='demoX'?'data-act="demoExit"':v==='demoO'?'data-act="demoOpen"':`data-go="${v}"`}>${l}<span>${d}</span></button>`).join('')}</div>`;
 }
 const bk=(v,l)=>`<button class="ghost" data-go="${v}" style="margin-bottom:10px">← ${l}</button>`;
 
@@ -1751,7 +1783,7 @@ function tiersSoldes(to,pre,sens){const m={};for(const e of posted()){if(e.date>
 /* Graphique mensuel : produits, charges et repère budget ; barres cliquables dans l'app */
 function chartSVG(data,print){
   const w=print?640:420,h=print?230:240,pl=print?46:40,pb=26,pt=12,n=data.length,gw=(w-pl-8)/n,mx=Math.max(1,...data.flatMap(d=>[d.p,d.c,d.b||0]));
-  const Y=v=>pt+(h-pt-pb)*(1-v/mx),ink=print?'#101418':'var(--ink)',sl=print?'#9aa6b0':'var(--sl)',gr=print?'#ddd':'var(--ln)',tx=print?'#333':'var(--sl)';
+  const Y=v=>pt+(h-pt-pb)*(1-v/mx),ink=print?'#101418':'var(--ac)',sl=print?'#9aa6b0':'var(--sl)',gr=print?'#ddd':'var(--ln)',tx=print?'#333':'var(--sl)';
   let s=`<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block" role="img" aria-label="Produits et charges par mois">`;
   for(let i=0;i<=4;i++){const v=mx*i/4,y=Y(v);s+=`<line x1="${pl}" x2="${w-4}" y1="${y}" y2="${y}" stroke="${gr}" stroke-width="1"/><text x="${pl-6}" y="${y+4}" text-anchor="end" font-size="11" fill="${tx}">${kf(v)}</text>`}
   data.forEach((d,i)=>{const x=pl+i*gw,bw=Math.max(3,gw*0.32),g=print?'':` data-act="tdbM" data-v="${d.mo}" style="cursor:pointer"`;
@@ -2561,6 +2593,48 @@ const CHPROB={'Prospect':10,'Devis envoyé':40,'Accepté':90,'En cours':100,'Ré
 function taskExp(x,t=today()){if(t<x.debut)return 0;if(t>=x.fin)return 100;return Math.round(dd(x.debut,t)/(dd(x.debut,x.fin)+1)*100)}
 function taskLate(x,t=today()){const av=+x.av||0;if(av>=100)return false;return x.fin<t||av<taskExp(x,t)-(+(D.settings.tolRetard??15))}
 
+/* ============ COULEURS PAR RUBRIQUE ============ */
+const AC={accueil:'#1d4f91',plus:'#1d4f91',direction:'#123c69',saisir:'#455a64',factures:'#1565c0',projets:'#3949ab',achats:'#6d4c41',stocks:'#00838f',paie:'#ad1457',etats:'#263238',reglages:'#37474f',materiel:'#5d6d7e',updchk:'#ffd84a',demoO:'#ffd84a',demoX:'#ffd84a'};
+const ACT_AC={ferme:'#2e7d32',poulets:'#c77700',pisci:'#0277bd',elec:'#d35400',couture:'#7b1fa2',peint:'#00897b'};
+function acFor(){if(!D)return AC.accueil;
+  if(view==='activites'){const a=sub.act||'ferme';return a==='couture'&&sub.cpv==='peint'?ACT_AC.peint:ACT_AC[a]||ACT_AC.ferme}
+  if(view==='commande')return ACT_AC.couture;if(view==='lot')return ACT_AC.pisci;
+  if(view==='projet'){const p=byId('projects',sub.pid);return p&&p.kind==='chantier'?(isPeint(p)?ACT_AC.peint:ACT_AC.elec):AC.projets}
+  return AC[view]||AC.accueil}
+/* ============ ALERTE DE MISE À JOUR (comme MupSOLAR) ============ */
+const APP_BUILD='202611222114',APP_NEWS=[["Tableau de bord interactif directement sur l'accueil : période, activité, comparaison avec le budget ou l'an dernier, détail au toucher", "accueil", {}, "#tdb"], ["Couleurs professionnelles par rubrique et par activité : chaque module a sa couleur (ferme verte, poulets ambre, pisciculture bleue, solaire orange, couture violette…)", "activites", {"act": "ferme"}, ".seg"], ["Alerte automatique à chaque mise à jour, avec la liste des nouveautés et « Me montrer » pour aller droit à la rubrique", "plus", {}, "[data-act=updChk]"], ["Chantiers : situations de travaux, avance de démarrage, retenue de garantie et sous-traitants", "activites", {"act": "elec"}, ".seg"], ["Créances et relances, trésorerie prévue sur 12 mois, dépôts et inventaire physique, matériel, congés, présences et prêts au personnel", "factures", {"fact": "R"}, ".seg"]];
+const APP_URL='https://mupglobalsarl.github.io/mupglobal-compta/',UPD_ONLINE=location.protocol==='https:'&&/mupglobalsarl\.github\.io$/i.test(location.hostname);
+const UPD_SNOOZE=(DEMO?'mgc_demo':'mgc')+'_upd_snooze',UPD_SEEN='mgc_build_seen';
+var UPD_AFTER=false;const UPD_OLD=(()=>{try{return !localStorage.getItem(UPD_SEEN)&&!!localStorage.getItem(SKEY)}catch(e){return false}})();let updShown=false,updLast=0;
+function updDate(b){const x=String(b||'');return x.length>=8?`${x.slice(6,8)}/${x.slice(4,6)}/${x.slice(0,4)}`:''}
+function updLs(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){return null}}
+async function updCheck(manual){if(!UPD_ONLINE){if(manual)toast(`Version 4 du ${updDate(APP_BUILD)} — vérification possible seulement dans l'application en ligne`);return}
+  if(!manual&&navigator.onLine===false)return;updLast=Date.now();
+  try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error(r.status);const v=await r.json();
+    if(String(v.build||'')>APP_BUILD){if(!manual){try{const z=JSON.parse(updLs(UPD_SNOOZE)||'{}');if(z.build===v.build&&z.until>Date.now())return}catch(e){}}updShow(v)}
+    else if(manual)toast(`Votre application est à jour (version 4 du ${updDate(APP_BUILD)})`)}
+  catch(e){if(manual)toast('Vérification impossible : connectez-vous à Internet puis réessayez')}}
+function updClose(){const b=document.getElementById('upd-bar');if(b)b.remove();updShown=false}
+function updShow(v){if(updShown)return;updShown=true;const notes=(v.notes||[]).slice(0,5),el=document.createElement('div');el.id='upd-bar';el.className='upd-bar';el.setAttribute('role','alertdialog');el.setAttribute('aria-labelledby','upd-t');
+  el.innerHTML=`<div class="upd-in"><div class="upd-h"><span class="upd-ic" aria-hidden="true">🔔</span><div><b id="upd-t">Mise à jour disponible</b><span>Version 4 du ${updDate(v.build)} · vous avez celle du ${updDate(APP_BUILD)}</span></div></div>
+  ${notes.length?`<ul>${notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>`:''}
+  <div class="upd-b"><button type="button" class="go" id="upd-go">Mettre à jour maintenant</button><button type="button" class="later" id="upd-later">Plus tard</button></div>
+  <p class="small" style="color:#c9d1d8;margin:6px 0 0">Vos données restent sur le téléphone, chiffrées ; rien n'est perdu.</p></div>`;
+  document.body.appendChild(el);
+  el.querySelector('#upd-later').onclick=()=>{updLs(UPD_SNOOZE,JSON.stringify({build:v.build,until:Date.now()+6*3600e3}));updClose();toast('Rappel dans 6 heures')};
+  el.querySelector('#upd-go').onclick=e=>{e.target.disabled=true;e.target.textContent='Mise à jour…';const go=async()=>{try{if(D)await saveNow()}catch(er){}location.replace(location.pathname.replace(/[^/]*$/,'')+'index.html?u='+Date.now()+(DEMO?'&demo=1':''))};
+    try{if(navigator.serviceWorker)navigator.serviceWorker.getRegistration().then(r=>r?r.update():null).catch(()=>{}).finally(()=>setTimeout(go,900));else go()}catch(er){go()}}}
+function updAfter(){UPD_AFTER=true;let seen=updLs(UPD_SEEN);if(!seen&&UPD_OLD)seen='0';updLs(UPD_SEEN,APP_BUILD);if(!seen||seen>=APP_BUILD)return;updLs(UPD_SNOOZE,null);
+  setTimeout(()=>{updClose();const el=document.createElement('div');el.id='upd-bar';el.className='upd-bar ok';el.setAttribute('role','dialog');
+    el.innerHTML=`<div class="upd-in"><div class="upd-h"><span class="upd-ic" aria-hidden="true">✅</span><div><b>Application mise à jour</b><span>Version 4 du ${updDate(APP_BUILD)} — nouveautés :</span></div></div>
+    <ul class="upd-news">${APP_NEWS.map((n,i)=>`<li><span>${esc(n[0])}</span>${n[1]?`<button type="button" data-act="showMe" data-v="${i}">Me montrer ›</button>`:''}</li>`).join('')}</ul>
+    <div class="upd-b"><button type="button" class="go" id="upd-ok">Compris</button></div></div>`;
+    document.body.appendChild(el);updShown=true;el.querySelector('#upd-ok').onclick=updClose},1000)}
+function showMe(i){const n=APP_NEWS[i];if(!n)return;updClose();Object.assign(sub,n[2]||{});go(n[1]);
+  setTimeout(()=>{const t=document.querySelector('#app '+n[3])||document.querySelector(n[3]);if(t){t.scrollIntoView({behavior:'smooth',block:'center'});t.classList.add('spot');setTimeout(()=>t.classList.remove('spot'),3600)}toast('La nouveauté est ici');},350)}
+function updInit(){setTimeout(()=>updCheck(false),4000);window.addEventListener('online',()=>updCheck(false));
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&Date.now()-updLast>30*60e3)updCheck(false)});setInterval(()=>updCheck(false),60*60e3)}
+
 /* ============ PROJETS, TÂCHES ET GANTT ============ */
 const PSTAT=['Prévu','En cours','Suspendu','Terminé'];
 function projStats(p){const ts=live(D.tasks).filter(t=>t.projet===p.id),t=today();const av=ts.length?Math.round(ts.reduce((s,x)=>s+(+x.av||0),0)/ts.length):(p.statut==='Terminé'?100:0);return {ts,av,late:ts.filter(x=>taskLate(x,t)).length}}
@@ -2862,6 +2936,7 @@ document.addEventListener('click',ev=>{
     cgForm:()=>cgForm(),cgDec:async()=>{const c=JSON.parse(JSON.stringify(byId('conges',id)));c.statut=b.dataset.v;c.apb=ME;await commit('conges',c,'décision congé',c.statut);render()},
     pretForm:()=>pretForm(),
     chLost:async()=>{const m=(window.prompt('Motif de la perte (prix trop élevé, concurrent, projet abandonné, délai…)')||'').trim();if(!m)return;const p=JSON.parse(JSON.stringify(byId('projects',id)));p.statut='Perdu';p.perdu=m.slice(0,120);await commit('projects',p,'affaire perdue',p.nom+' : '+m);render()},
+    updChk:()=>updCheck(true),showMe:()=>showMe(+b.dataset.v),
     tdbM:()=>{sub.tp='m';sub.tm=b.dataset.v;render()},tdbA:()=>{sub.ta=sub.ta===b.dataset.v?'':b.dataset.v;render()},drill:()=>drill(b.dataset.v),
     budForm:()=>budForm(b.dataset.v),objForm:()=>objForm(id),
     budSplit:()=>{const p=+$('#bpt').value||0,c=+$('#bct').value||0;for(let i=0;i<12;i++){if(p)$('#fbud [name=p'+i+']').value=r2(p/12);if(c)$('#fbud [name=c'+i+']').value=r2(c/12)}},
@@ -3036,6 +3111,7 @@ function exportCSV(){
   if(!window.crypto||!crypto.subtle){$('#app').innerHTML='<p class="empty">Ce navigateur ne permet pas le chiffrement. Ouvrez l\'application avec Chrome récent, depuis un lien https.</p>';return}
   loadHDR();render();
   if(location.protocol.startsWith('http')&&'serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+  updInit();
 })();
 window.__mg={st:()=>({D,HDR,LOC,ME}),merge,canon,bilan,resultat,bEx,bTo,tresoFx,verifyAudit,lettres,montantLettres,exportRaw:async()=>packFile('sync',{D:{...D},from:meU().nom,at:NOW()},LOC.pass)};
 }
