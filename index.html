@@ -2817,7 +2817,7 @@ function acFor(){if(!D)return AC.accueil;
   if(view==='projet'){const p=byId('projects',sub.pid);return p&&p.kind==='chantier'?(isPeint(p)?ACT_AC.peint:ACT_AC.elec):AC.projets}
   return AC[view]||AC.accueil}
 /* ============ ALERTE DE MISE À JOUR (comme MupSOLAR) ============ */
-const APP_BUILD='202611260916',APP_NEWS=[["Test de restauration : tableau Contenu, Copie, Téléphone lisible sur téléphone", "reglages", {"reg": "sync"}, "#app h3"]];
+const APP_BUILD='202611260953',APP_NEWS=[["Démarrage immédiat : l'application s'ouvre depuis le téléphone sans attendre internet, même avec un réseau faible", "accueil", {}, "#app"]];
 const APP_URL='https://mupglobalsarl.github.io/mupglobal-compta/',UPD_ONLINE=location.protocol==='https:'&&/mupglobalsarl\.github\.io$/i.test(location.hostname);
 const UPD_SNOOZE=(DEMO?'mgc_demo':'mgc')+'_upd_snooze',UPD_SEEN='mgc_build_seen';
 var UPD_AFTER=false;const UPD_OLD=(()=>{try{return !localStorage.getItem(UPD_SEEN)&&!!localStorage.getItem(SKEY)}catch(e){return false}})();let updShown=false,updLast=0;

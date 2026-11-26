@@ -1,1 +1,1 @@
-{"build": "202611260916", "ver": "4", "notes": ["Test de restauration : tableau Contenu, Copie, Téléphone lisible sur téléphone"]}
+{"build": "202611260953", "ver": "4", "notes": ["Démarrage immédiat : l'application s'ouvre depuis le téléphone sans attendre internet, même avec un réseau faible"]}
