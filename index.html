@@ -292,6 +292,8 @@ header h1 small{display:flex;align-items:center;gap:6px}.dot{width:8px;height:8p
 .onp{border-top:1px solid var(--mg-bd);background:light-dark(#f7f9fc,#0f1d30);text-align:left;padding:4px 6px}
 .onp>div{display:flex;align-items:center;gap:6px;padding:5px 2px;cursor:pointer}.onp>div>span:last-child{display:flex;flex-direction:column;min-width:0}.onp b{font-size:11.5px;line-height:1.2}.onp small{font-size:10.5px;color:var(--mg-mut)}.onp .vac{color:#B42318}
 .onp>div>img,.onp>div>span:first-child{flex:none}
+.fnok{border-left:4px solid var(--mg-ok,#287A45)}.fnko{border-left:4px solid #B42318;background:light-dark(#fff6f5,#2a1414)}
+.doc .fnbox{margin:10px 0;border:1.5px solid #174A7E;padding:8px 10px;font-size:12.5px}
 </style>
 <script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
 </head>
@@ -476,7 +478,7 @@ function canWrite(u,c,r,old){
       break;
     case 'docs':
       if(r.type==='D'){if(!adm&&!own)return 'devis d\'un autre utilisateur';break}
-      if(old&&old.st==='E')return 'document émis intangible (utilisez un avoir)';
+      if(old&&old.st==='E'){if(adm&&r.st==='E'&&validFn(r.fn)&&sameExcept(old,r,['fn']))break;return 'document émis intangible (utilisez un avoir)'}
       if(r.st==='E'&&!adm)return 'émission réservée au gérant ou au comptable';
       if(!adm&&!own)return 'brouillon d\'un autre utilisateur';
       if(r.st==='E'&&lockedFor(dt,r.upd))return 'période clôturée';
@@ -805,7 +807,7 @@ function setupScreen(){
 }
 async function setupNew(F){
   if(F.pin!==F.pin2)throw new Error('Les deux PIN sont différents');
-  if(!/^\d{6,}$/.test(F.pin))throw new Error('Le PIN doit avoir au moins 6 chiffres');
+  if(!/^\d{6,}$/.test(F.pin))throw new Error('Le PIN doit avoir au moins 6 chiffres');if(!DEMO&&pinWeak(F.pin))throw new Error('PIN trop simple (suite ou répétition de chiffres) : choisissez-en un autre');if(!DEMO&&pinWeak(F.pin))throw new Error('PIN trop simple (suite ou répétition de chiffres) : choisissez-en un autre');
   if(F.pass!==F.pass2)throw new Error('Les deux codes entreprise sont différents');
   if(F.pass.length<12)throw new Error('Code entreprise trop court');
   if(F.mig&&F.base!=='USD')throw new Error('Les données de la version 1 sont en USD : choisissez USD comme monnaie de tenue');
@@ -852,16 +854,17 @@ async function unlock(id,pin){
   if(h.until&&h.until>NOW())throw new Error('Trop d\'essais. Réessayez dans '+Math.ceil((h.until-NOW())/1000)+' s');
   const kek=await kdf(pin,b64d(h.salt));let raw;
   try{raw=await aesD(kek,h.w)}catch(e){h.fails=(h.fails||0)+1;if(h.fails>=5)h.until=NOW()+30000*2**Math.min(h.fails-5,8);localStorage.setItem(SKEY,JSON.stringify(HDR));throw new Error('Code PIN incorrect'+(h.fails>=3?' ('+h.fails+' essais)':''))}
+  let KP=null;if(h.wa){KP=await waPrf(h.wa.cred,h.wa.salt);raw=await aesD(KP,JSON.parse(dec.decode(raw)))}const PJB=await waUnwrap(h,kek,h.p,KP);SESSION_KPRF=KP;PINWEAK=!DEMO&&pinWeak(pin);
   DEK=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt','decrypt']);
-  PRIV=await crypto.subtle.importKey('jwk',JSON.parse(dec.decode(await aesD(kek,h.p))),ECP,false,['sign']);KID=h.kid;
+  PRIV=await crypto.subtle.importKey('jwk',JSON.parse(dec.decode(PJB)),ECP,false,['sign']);KID=h.kid;
   const v=JSON.parse(dec.decode(await aesD(DEK,HDR.data)));D=v.D;LOC=v.LOC;for(const c of COLL)D[c]=D[c]||[];ME=id;h.fails=0;h.until=0;VER++;
-  SESSION_RAW=raw;SESSION_PJ=JSON.parse(dec.decode(await aesD(kek,h.p)));
+  SESSION_RAW=raw;SESSION_PJ=JSON.parse(dec.decode(PJB));
   const u=meU();if(!u||u.del||u.actif===false){lockNow();throw new Error('Cet utilisateur a été retiré par le gérant')}
   UI.lastUser=id;saveUI();await audit('connexion','users',id,u.nom);
   if(SRV())setTimeout(()=>pull().then(()=>push()).catch(e=>{SYNC.err=e.message}),500);
   if(h.must){render();changePinForm(true);return}
 }
-async function lockNow(){if(D){await saveNow()}D=null;LOC=null;DEK=null;PRIV=null;KID=null;ME=null;SESSION_RAW=null;SESSION_PJ=null;VK=null;for(const k in VC)delete VC[k];for(const k in PHURL){URL.revokeObjectURL(PHURL[k]);delete PHURL[k]}MATIN=false;closeSheet();loadHDR();render()}
+async function lockNow(){if(D){await saveNow()}D=null;LOC=null;DEK=null;PRIV=null;KID=null;ME=null;SESSION_RAW=null;SESSION_PJ=null;SESSION_KPRF=null;RTOK=null;PINWEAK=false;VK=null;for(const k in VC)delete VC[k];for(const k in PHURL){URL.revokeObjectURL(PHURL[k]);delete PHURL[k]}MATIN=false;closeSheet();loadHDR();render()}
 let lastAct=NOW(),hiddenAt=0;
 ['pointerdown','keydown'].forEach(t=>document.addEventListener(t,()=>{lastAct=NOW()},{passive:true}));
 setInterval(()=>{if(D&&NOW()-lastAct>5*60e3)lockNow().then(()=>toast('Verrouillé après 5 minutes d\'inactivité'))},20e3);
@@ -872,10 +875,10 @@ function changePinForm(must){openSheet(`<h2>${must?'Choisissez votre code PIN pe
 async function setPin(pin,oldPin){
   const h=HDR.users.find(u=>u.id===ME);
   if(oldPin!==undefined){try{await aesD(await kdf(oldPin,b64d(h.salt)),h.w)}catch(e){throw new Error('PIN actuel incorrect')}}
-  if(!/^\d{6,}$/.test(pin))throw new Error('Le PIN doit avoir au moins 6 chiffres');
+  if(!/^\d{6,}$/.test(pin))throw new Error('Le PIN doit avoir au moins 6 chiffres');if(!DEMO&&pinWeak(pin))throw new Error('PIN trop simple (suite ou répétition de chiffres) : choisissez-en un autre');if(h.wa&&!SESSION_KPRF)throw new Error('Session expirée : reconnectez-vous');
   const raw=SESSION_RAW,pj=SESSION_PJ;if(!raw||!pj)throw new Error('Session expirée : reconnectez-vous');
   const salt=rnd(16),kek=await kdf(pin,salt);
-  Object.assign(h,{salt:b64e(salt),w:await aesE(kek,raw),p:await aesE(kek,enc.encode(JSON.stringify(pj))),must:false,fails:0});
+  const kp=h.wa?SESSION_KPRF:null;Object.assign(h,{salt:b64e(salt),w:await waWrap(kek,kp,raw),p:await waWrap(kek,kp,enc.encode(JSON.stringify(pj))),must:false,fails:0});PINWEAK=false;
   await audit('changement de PIN','users',ME,meU().nom);await saveNow();
 }
 
@@ -936,7 +939,7 @@ async function joinStart(text){JOIN={text};openSheet(`<h2>Rejoindre l'entreprise
   <label class="f">Confirmer le nouveau PIN<input class="pin" type="password" name="pin2" inputmode="numeric" minlength="6" required></label>
   <div class="btns"><button class="pr" type="submit">Vérifier et rejoindre</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
 async function joinFinish(F){
-  if(F.pin!==F.pin2)throw new Error('Les deux PIN sont différents');if(!/^\d{6,}$/.test(F.pin))throw new Error('Le PIN doit avoir au moins 6 chiffres');
+  if(F.pin!==F.pin2)throw new Error('Les deux PIN sont différents');if(!/^\d{6,}$/.test(F.pin))throw new Error('Le PIN doit avoir au moins 6 chiffres');if(!DEMO&&pinWeak(F.pin))throw new Error('PIN trop simple (suite ou répétition de chiffres) : choisissez-en un autre');
   toast('Vérification du fichier et des signatures… patientez');
   const {f,p}=await unpackFile(JOIN.text,F.pass);if(f.kind!=='invite'||!p.invite)throw new Error('Ce fichier n\'est pas une invitation');
   const inv=p.invite;let pj;
@@ -1002,8 +1005,16 @@ function alertes(){
   for(const p of live(D.projects).filter(p=>p.kind==='chantier'&&['Accepté','En cours'].includes(p.statut)&&p.fin<t))a.push(['o',`Chantier ${esc(p.nom)} : fin prévue le ${dfr(p.fin)} dépassée`,'activites']);
   const lm=new Date();lm.setDate(0);const prevM=lm.toLocaleDateString('sv-SE').slice(0,7);
   if(isGerant()&&lockDate()<lastDay(prevM))a.push(['o',`Le mois de ${MOISL[+prevM.slice(5)-1]} n'est pas encore clôturé`,'reglages']);
-  const days=LOC.lastExport?Math.floor((NOW()-LOC.lastExport)/864e5):null;
-  if(days===null||days>7)a.push(['o',days===null?'Aucune sauvegarde chiffrée envoyée depuis ce téléphone':`Dernière sauvegarde il y a ${days} jours`,'reglages']);
+  const lastBk=Math.max(LOC.lastExport||0,LOC.lastSnap||0),days=lastBk?Math.floor((NOW()-lastBk)/864e5):null;
+  if(days===null||days>7)a.push(['o',days===null?'Aucune sauvegarde chiffrée depuis ce téléphone':`Dernière sauvegarde il y a ${days} jours`,'reglages']);
+  if(isGerant()){const dx=x=>x?Math.floor((NOW()-x)/864e5):null,de=dx(LOC.lastExport),dt=dx(LOC.lastTest);
+    if(SRV()&&LOC.lastSnap&&(de===null||de>31))a.push(['o','Rangez une copie de sauvegarde hors serveur (Google Drive) : « Envoyer mes données »','reglages']);
+    if(lastBk&&(dt===null||dt>31))a.push(['o','Test mensuel de restauration d\'une sauvegarde à faire','reglages']);
+    if(gerantsActifs().length<2)a.push(['o','Un seul gérant enregistré : créez un accès gérant de secours (co-associée) et imprimez le kit de secours','reglages']);
+    if(!D.settings.fnorm)a.push(['o','Facture normalisée DGI : indiquez si la société est assujettie à la TVA (Réglages › Entreprise)','reglages'])}
+  if(PINWEAK)a.push(['r','Votre code PIN est trop simple : changez-le (Réglages › Sécurité)','reglages']);
+  if(isAdmin()&&!DEMO&&WA_OK&&!(HDR.users.find(u=>u.id===ME)||{}).wa)a.push(['o','Activez la protection par empreinte sur ce téléphone (Réglages › Sécurité)','reglages']);
+  if(isAdmin()&&fnOn()){const n=fnMissing().length;if(n)a.push(['r',`${n} facture(s) émise(s) sans code de facture normalisée DGI`,'factures'])}
   return a;
 }
 function accueil(){return welcome2()+(TERRAIN_ROLES.includes(role())?terrainHome():accueil0())}
@@ -1127,14 +1138,15 @@ function mCheck(){if(!$('#mtot'))return;const ls=mLines();const d=r2(ls.reduce((
 function nextNum(pre){const y=new Date().getFullYear(),p=pre+'-'+y+'-'+LOC.code;let mx=0;for(const d of D.docs)if(d.num&&d.num.startsWith(p)){const n=parseInt(d.num.slice(p.length));if(n>mx)mx=n}return p+String(mx+1).padStart(4,'0')}
 function factures(){
   const f=sub.fact||'F',q=(sub.q||'').toLowerCase();
-  const ds=live(D.docs).filter(d=>f==='F'?(d.type==='F'||d.type==='A'):d.type===f).filter(d=>!q||((d.num||'')+' '+tiersNom(d.client)).toLowerCase().includes(q)).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.num||'').localeCompare(a.num||''));
+  const fnf=f==='F'&&fnOn()&&sub.fnf==='1';const ds=live(D.docs).filter(d=>f==='F'?(d.type==='F'||d.type==='A'):d.type===f).filter(d=>!fnf||fnNeeded(d)).filter(d=>!q||((d.num||'')+' '+tiersNom(d.client)).toLowerCase().includes(q)).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.num||'').localeCompare(a.num||''));
   const enc=r2(live(D.docs).filter(d=>d.type==='F'&&d.st==='E').reduce((s,d)=>s+toBase(Math.max(0,docDue(d)),d.cur,d.rate),0));
   return `<h2>Factures et devis</h2>
   <div class="seg"><button class="${f==='F'?'on':''}" data-act="sub" data-k="fact" data-v="F">Factures et avoirs</button><button class="${f==='D'?'on':''}" data-act="sub" data-k="fact" data-v="D">Devis</button><button class="${f==='R'?'on':''}" data-act="sub" data-k="fact" data-v="R">Créances et relances</button><button class="${f==='T'?'on':''}" data-act="sub" data-k="fact" data-v="T">Clients et fournisseurs</button></div>
   ${f==='R'?creances():f==='T'?tiersView():`<div class="btns"><button class="pr" data-act="doc" data-k="${f}">+ ${f==='F'?'Nouvelle facture':'Nouveau devis'}</button></div>
   ${f==='F'?`<p class="muted">Reste à encaisser sur les factures émises : <b>${money(enc)}</b></p>`:''}
+  ${f==='F'&&fnOn()?(()=>{const n=fnMissing().length;return `<div class="btns"><div class="seg" style="margin:0"><button class="${!fnf?'on':''}" data-act="sub" data-k="fnf" data-v="0">Toutes</button><button class="${fnf?'on':''}" data-act="sub" data-k="fnf" data-v="1">Sans code DGI (${n})</button></div></div>`})():''}
   <input type="search" id="fq2" placeholder="Rechercher un numéro ou un client" value="${esc(sub.q||'')}" style="width:100%;margin-bottom:12px">
-  ${ds.length?`<table class="stack"><thead><tr><th>N°</th><th>Client</th><th>Date</th><th class="n">Montant</th><th>Statut</th><th></th></tr></thead><tbody>${ds.map(d=>{const s=docStatus(d),t=docTot(d);return `<tr><td><b>${esc(d.num||'(brouillon)')}</b></td><td>${esc(tiersNom(d.client))}</td><td>${dfr(d.date)}</td><td class="n">${d.type==='A'?'−':''}${money(t.ttc,d.cur)}${d.type==='F'&&d.st==='E'&&s[1]==='Partielle'?`<br><span class="small muted">reste ${money(docDue(d),d.cur)}</span>`:''}</td><td><span class="tag ${s[0]}">${s[1]}</span></td><td><button class="ghost" data-act="openDoc" data-id="${esc(d.id)}">Ouvrir</button></td></tr>`}).join('')}</tbody></table>`:`<p class="empty">Rien pour l'instant.</p>`}`}`;
+  ${ds.length?`<table class="stack"><thead><tr><th>N°</th><th>Client</th><th>Date</th><th class="n">Montant</th><th>Statut</th><th></th></tr></thead><tbody>${ds.map(d=>{const s=docStatus(d),t=docTot(d);return `<tr><td><b>${esc(d.num||'(brouillon)')}</b></td><td>${esc(tiersNom(d.client))}</td><td>${dfr(d.date)}</td><td class="n">${d.type==='A'?'−':''}${money(t.ttc,d.cur)}${d.type==='F'&&d.st==='E'&&s[1]==='Partielle'?`<br><span class="small muted">reste ${money(docDue(d),d.cur)}</span>`:''}</td><td><span class="tag ${s[0]}">${s[1]}</span>${d.fn?' <span class="tag g">DGI</span>':fnNeeded(d)?' <span class="tag r">Sans code DGI</span>':''}</td><td><button class="ghost" data-act="openDoc" data-id="${esc(d.id)}">Ouvrir</button></td></tr>`}).join('')}</tbody></table>`:`<p class="empty">Rien pour l'instant.</p>`}`}`;
 }
 function tiersView(){
   const bal=memo('tiersBal',()=>{const m={};for(const e of posted())for(const l of e.lines)if(l.t&&/^4[01]/.test(l.c))m[l.t]=r2((m[l.t]||0)+(+l.d||0)-(+l.k||0));return m});
@@ -1201,6 +1213,7 @@ function docView(id){
   ${F&&E?`<h3>Encaissements et avoirs</h3>${pays.map(p=>`<div class="card"><div class="top"><span>${dfr(p.date)} · ${esc(TR(p.tr)?.[1]||'')}${p.st==='X'?' <span class="tag r">Annulé</span>':''}</span><span class="amt">${money(p.mt,p.cur)}</span></div>${p.st==='V'&&isAdmin()&&!locked(today())?`<button class="dg" style="margin-top:6px" data-act="cancelPay" data-id="${esc(p.id)}">Annuler (contrepassation)</button>`:''}</div>`).join('')}
   ${avs.map(a=>`<div class="card"><div class="top"><span>Avoir ${esc(a.num||'(brouillon)')}</span><span class="amt">−${money(docTot(a).ttc,a.cur)}</span></div></div>`).join('')}${!pays.length&&!avs.length?'<p class="muted">Aucun encaissement.</p>':''}
   <p>Reste à payer : <b>${money(docDue(d),d.cur)}</b></p>`:''}
+  ${fnBlock(d)}
   <div class="btns">
     ${F&&E&&docDue(d)>0.005&&isAdmin()?`<button class="pr" data-act="payDoc" data-id="${esc(id)}">Enregistrer un paiement</button>`:''}
     ${d.st==='B'&&d.type!=='D'&&isAdmin()?`<button class="pr" data-act="issueDoc" data-id="${esc(id)}">Émettre ${d.type==='A'?'l\'avoir':'la facture'}</button>`:''}
@@ -1237,7 +1250,7 @@ function docHTML(d){
   <div class="meta"><div>${[S.rccm&&'RCCM : '+S.rccm,S.idnat&&'Id. Nat. : '+S.idnat,S.nif&&'NIF : '+S.nif].filter(Boolean).map(esc).join('<br>')}</div><div class="box"><b>Client</b><br>${esc(c.nom||'')}<br>${esc(c.adresse||'')}${c.tel?'<br>Tél. '+esc(c.tel):''}${c.nif?'<br>NIF : '+esc(c.nif):''}</div></div>
   <table><thead><tr><th>Désignation</th><th class="n">Qté</th><th class="n">Prix unitaire</th><th class="n">Montant</th></tr></thead><tbody>${d.lignes.map(l=>`<tr><td>${esc(l.des)}</td><td class="n">${fmtQ(l.q)}</td><td class="n">${fmt(l.pu)}</td><td class="n">${fmt(l.q*l.pu)}</td></tr>`).join('')}</tbody></table>
   <table class="tt" style="width:auto;margin-left:auto;margin-top:8px"><tr><td>Total HT</td><td class="n">${money(t.ht,d.cur)}</td></tr>${t.tva?`<tr><td>TVA ${esc(d.tvaRate)} %</td><td class="n">${money(t.tva,d.cur)}</td></tr>`:''}<tr><td><b>Total TTC</b></td><td class="n"><b>${money(t.ttc,d.cur)}</b></td></tr>${d.sit?`<tr><td>Retenue de garantie ${esc(d.sit.rgPct)} %</td><td class="n">− ${money(d.sit.rg,d.cur)}</td></tr>${+d.sit.remb?`<tr><td>Remboursement de l'avance</td><td class="n">− ${money(d.sit.remb,d.cur)}</td></tr>`:''}<tr><td><b>Net à payer</b></td><td class="n"><b>${money(t.net,d.cur)}</b></td></tr>`:''}${d.type==='F'&&d.st==='E'&&(docPaid(d)||docAvoirs(d))?`<tr><td>Avoirs et paiements reçus</td><td class="n">${money(docAvoirs(d)+docPaid(d),d.cur)}</td></tr><tr><td><b>Reste à payer</b></td><td class="n"><b>${money(docDue(d),d.cur)}</b></td></tr>`:''}${d.cur!==BASE()?`<tr><td class="small">Contre-valeur au taux ${fmt(d.rate)}</td><td class="n small">${money(toBase(t.ttc,d.cur,d.rate))}</td></tr>`:''}</table>
-  <p>Arrêté${d.type==='D'?' le présent devis':'e la présente facture'} à la somme de : <b>${esc(montantLettres(d.sit?t.net:t.ttc,d.cur))}</b>.</p>
+  ${fnPrint(d)}<p>Arrêté${d.type==='D'?' le présent devis':'e la présente facture'} à la somme de : <b>${esc(montantLettres(d.sit?t.net:t.ttc,d.cur))}</b>.</p>
   ${d.notes?`<p>${esc(d.notes).replace(/\n/g,'<br>')}</p>`:''}<p class="small">${esc(S.mentions)}</p>
   <div class="sig">Pour ${esc(S.nom)}<br>${S.signature&&RX.img.test(S.signature)&&d.st!=='B'?`<img src="${S.signature}" alt="Signature">`:'<br><br>'}<br>${ger?esc(ger.nom)+', Gérant':''}</div>
   <div class="foot">${esc(S.nom)} · ${esc(S.adresse)}${S.rccm?' · RCCM '+esc(S.rccm):''}</div></div>`;
@@ -1442,10 +1455,11 @@ function reglages(){
   sync:()=>`<p>Chaque téléphone garde ses données chiffrées. Pour travailler à plusieurs, chacun envoie son <b>fichier chiffré</b> (WhatsApp, e-mail…) et l'autre l'importe. Chaque élément est vérifié : signature de son auteur, droits de son rôle, période ouverte. Ce qui ne passe pas est refusé et listé.</p>
     <p class="small muted">Dernier envoi depuis ce téléphone : ${esc(last)}.</p>
     <div class="btns"><button class="pr" data-act="export">Envoyer mes données</button><label class="bt">Importer un fichier<input type="file" id="imp" accept="*/*" hidden></label></div>
+    ${bkPanel()}
     <h3>Synchronisation automatique par serveur</h3>${srvPanel()}`,
   securite:()=>langSel()+`<p>Connecté : <b>${esc(meU().nom)}</b> (${esc(role())}). Empreinte de votre clé : <span class="fp">${esc(fpr(KID))}</span></p>
     <div class="btns"><button data-act="changePin">Changer mon PIN</button><button class="ghost" data-act="lockNow">Verrouiller maintenant</button></div>
-    <ul class="small muted"><li>Données chiffrées sur le téléphone (AES-256-GCM), clé protégée par votre PIN (PBKDF2, ${ITER.toLocaleString('fr-FR')} itérations).</li><li>Chaque saisie est signée avec votre clé personnelle (ECDSA P-256).</li><li>Verrouillage automatique après 5 minutes d'inactivité. Blocage progressif après 5 PIN erronés.</li><li>Les fichiers échangés sont chiffrés et authentifiés avec le code entreprise.</li></ul>`,
+    <ul class="small muted"><li>Données chiffrées sur le téléphone (AES-256-GCM), clé protégée par votre PIN (PBKDF2, ${ITER.toLocaleString('fr-FR')} itérations).</li><li>Chaque saisie est signée avec votre clé personnelle (ECDSA P-256).</li><li>Verrouillage automatique après 5 minutes d'inactivité. Blocage progressif après 5 PIN erronés.</li><li>Les fichiers échangés sont chiffrés et authentifiés avec le code entreprise.</li></ul>${waPanel()}`,
   users:()=>`<table class="stack"><thead><tr><th>Nom</th><th>Rôle</th><th>Appareils</th><th></th></tr></thead><tbody>${live(D.users).map(u=>`<tr><td><b>${esc(u.nom)}</b>${u.actif===false?' <span class="tag r">Retiré</span>':''}</td><td>${esc(roleName(u.role))}</td><td>${u.keys.filter(k=>!k.rev).map(k=>esc(k.code)).join(', ')||'—'}</td><td><button class="ghost" data-act="user" data-id="${esc(u.id)}">Gérer</button></td></tr>`).join('')}</tbody></table>
     <div class="btns"><button class="pr" data-act="user">+ Ajouter un collaborateur</button></div>
     <h3>Rôles</h3><table class="stack"><thead><tr><th>Rôle</th><th>Droits</th><th></th></tr></thead><tbody>
@@ -1468,7 +1482,7 @@ function reglages(){
     <div class="row2"><label class="f">NIF<input name="nif" value="${esc(S.nif)}" maxlength="60"></label><label class="f">Téléphone<input name="tel" value="${esc(S.tel)}" maxlength="40"></label></div>
     <label class="f">E-mail<input name="email" value="${esc(S.email)}" maxlength="120"></label>
     <div class="row2"><label class="f">Monnaie de tenue<input value="${esc(S.base)}" disabled></label><label class="f">Taux du jour (FC pour 1 $)<input type="number" name="taux" step="0.01" min="1" value="${esc(S.taux)}"></label></div>
-    <div class="row2"><label class="f">Taux de TVA (%)<input type="number" name="tva" step="0.1" min="0" value="${esc(S.tva)}"></label><label class="chk" style="margin-top:28px"><input type="checkbox" name="tvaDefaut" ${S.tvaDefaut?'checked':''}> TVA cochée par défaut</label></div>
+    <div class="row2"><label class="f">Taux de TVA (%)<input type="number" name="tva" step="0.1" min="0" value="${esc(S.tva)}"></label><label class="chk" style="margin-top:28px"><input type="checkbox" name="tvaDefaut" ${S.tvaDefaut?'checked':''}> TVA cochée par défaut</label></div>${fnSettings(S)}
     <div class="row2"><label class="f">CNSS salarié (%)<input type="number" name="cnssSal" step="0.01" min="0" value="${esc(S.cnssSal)}"></label><label class="f">CNSS employeur (%)<input type="number" name="cnssPat" step="0.01" min="0" value="${esc(S.cnssPat)}"></label></div>
     <div class="row2"><label class="f">INPP (%)<input type="number" name="inpp" step="0.01" min="0" value="${esc(S.inpp)}"></label><label class="f">ONEM (%)<input type="number" name="onem" step="0.01" min="0" value="${esc(S.onem)}"></label></div>
     <div class="row2"><label class="f">IPR : réduction par personne à charge (% de l'impôt)<input type="number" name="iprFam" step="0.1" min="0" value="${esc(S.iprFam??2)}"></label><label class="f">IPR : personnes à charge au maximum<input type="number" name="iprFamMax" step="1" min="0" value="${esc(S.iprFamMax??9)}"></label></div>
@@ -2458,6 +2472,9 @@ async function seedDemo(){
    const P=t=>(live(D.postes).find(x=>x.intitule===t)||{}).id||'';let i=0;
    for(const e of live(D.emps)){if(!e.photo){const x=JSON.parse(JSON.stringify(e));x.photo=av(i++);await commit('emps',x,'photo',x.nom,{noAudit:true})}}
    for(const [nom,pi,base] of [['Joséphine Mbuyi','Comptable principal','900'],['Daniel Kabwe','Caissier','350'],['Christian Ilunga','Magasinier et acheteur','400'],['Grâce Mwamba','Assistant(e) des ressources humaines','450'],['Olivier Tshibangu','Responsable commercial','700'],['Pascal Kalenga','Chef de projet électricité et solaire','1100'],['Sarah Kapinga','Ouvrier agricole','150'],['Benjamin Nkulu','Ouvrier agricole','150'],['Rachel Banza','Chef d\'équipe peinture','380']]){const po=P(pi);if(!po)continue;await S('fe',{nom,poste:pi,tel:'',base,cur:'USD',cnss:'',pac:'1',emb:'2024-03-01',cgReport:'0',act:A.fg,actif:'on',posteId:po,photo:av(i++)},{id:''})}}
+  {await commitSettings({...D.settings,fnorm:'oui',fnDebut:'2025-12-01',fnDef:'e-UF'},'démonstration','');
+   const fs=live(D.docs).filter(d=>(d.type==='F'||d.type==='A')&&d.st==='E').sort((a,b)=>a.date.localeCompare(b.date)||(a.num||'').localeCompare(b.num||''));let i=0;
+   for(const d of fs.slice(0,Math.max(0,fs.length-2))){const x=JSON.parse(JSON.stringify(d));x.fn={code:'EUF-'+x.date.replace(/-/g,'')+'-'+String(++i).padStart(5,'0')+'-DEMO',def:'e-UF',date:x.date,ttc:docTot(x).ttc};await commit('docs',x,'facture normalisée',x.num,{noAudit:true})}}
   {const p=live(D.projects).find(x=>x.nom.startsWith('Éclairage solaire public'));const ts=live(D.tasks).filter(x=>x.projet===p.id).sort((a,b)=>a.debut.localeCompare(b.debut));const tk=ts.find(x=>(+x.av||0)>0&&(+x.av||0)<100)||ts[0];
    for(const [k,txt,pb] of [[3,'Fouilles et coffrage de 6 massifs, rue Lumumba.',''],[2,'Coulage du béton de 6 massifs. Livraison de 10 lampadaires.','Pluie de 14 h à 16 h : 2 heures perdues.'],[1,'Pose et raccordement de 5 lampadaires. Essais nocturnes concluants.','']]){const d=addDays(T,-k);if(d<p.debut)continue;const j={id:uid(),date:d,ref:{t:'task',id:tk.id},meteo:pb?'Pluie':'Ensoleillé',eff:6,trav:txt,pb,bes:k===3?'Ciment : 20 sacs pour demain':'',av:null,ph:[]};await commit('journ',j,'rapport journalier',p.nom)}
    await commit('journ',{id:uid(),date:addDays(T,-1),ref:{t:'act',id:A.ferme},meteo:'Ensoleillé',eff:4,trav:'Récolte de 120 kg d\'aubergines, désherbage de la parcelle B.',pb:'',bes:'Engrais NPK : 2 sacs',av:null,ph:[]},'rapport journalier','Ferme')}
@@ -2800,7 +2817,7 @@ function acFor(){if(!D)return AC.accueil;
   if(view==='projet'){const p=byId('projects',sub.pid);return p&&p.kind==='chantier'?(isPeint(p)?ACT_AC.peint:ACT_AC.elec):AC.projets}
   return AC[view]||AC.accueil}
 /* ============ ALERTE DE MISE À JOUR (comme MupSOLAR) ============ */
-const APP_BUILD='202611260006',APP_NEWS=[["Organigramme graphique : arbre de l'assemblée des associés jusqu'à chaque poste, avec photo et nom de chaque personne, postes vacants en rouge", "organisation", {"orv": "org"}, ".ot"], ["Organigramme : zoom 100 / 75 / 50 %, vue en liste, et impression de l'arbre en PDF", "organisation", {"orv": "org"}, "#app .btns"], ["Démonstration : 9 employés de plus, avec photo illustrée, pour voir un organigramme complet", "organisation", {"orv": "org"}, ".ot"]];
+const APP_BUILD='202611260756',APP_NEWS=[["Facture normalisée DGI : code e-UF à reporter sur chaque facture émise, filtre « Sans code DGI » et mention à l'impression", "factures", {}, "#app .seg"], ["Sauvegardes : copie chiffrée chaque semaine sur le serveur, et test de restauration sans rien modifier", "reglages", {"reg": "sync"}, "#app h3"], ["Kit de secours à imprimer et déposer chez l'avocat : codes, comptes et procédure de reprise", "reglages", {"reg": "sync"}, "#app h3"], ["Protection par empreinte : le PIN et l'empreinte sont demandés pour ouvrir l'application", "reglages", {"reg": "securite"}, "#app h3"], ["PIN trop simples refusés ; serveur réservé aux téléphones qui ont le code entreprise", "reglages", {"reg": "securite"}, "#app h3"]];
 const APP_URL='https://mupglobalsarl.github.io/mupglobal-compta/',UPD_ONLINE=location.protocol==='https:'&&/mupglobalsarl\.github\.io$/i.test(location.hostname);
 const UPD_SNOOZE=(DEMO?'mgc_demo':'mgc')+'_upd_snooze',UPD_SEEN='mgc_build_seen';
 var UPD_AFTER=false;const UPD_OLD=(()=>{try{return !localStorage.getItem(UPD_SEEN)&&!!localStorage.getItem(SKEY)}catch(e){return false}})();let updShown=false,updLast=0;
@@ -2865,7 +2882,7 @@ async function photoUrl(id,kind){const PR=byId('photos',id)||{};if(PR.pdf)kind='
   if(!o)return null;const b=new Blob([await aesD(DEK,o)],{type:PR.pdf?'application/pdf':'image/jpeg'});return PHURL[key]=URL.createObjectURL(b)}
 let PHUP=false;
 async function photoUpload(){if(PHUP||!SRV()||!navigator.onLine)return;PHUP=true;let n=0;try{for(const id of await idbKeys('q')){for(const kind of ['t','f']){const o=await idbGet('p',id+'|'+kind);if(!o)continue;
-  await srvFetch('mgc_photos?on_conflict=company,id,kind',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({company:D.settings.cr,device:HDR.dev,id,kind,data:JSON.stringify(o),owner_hash:await sha(LOC.tok)})})}await idbDel('q',id);n++}}
+  await srvFetch('mgc_photos?on_conflict=company,id,kind',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({company:D.settings.cr,device:HDR.dev,id,kind,data:JSON.stringify(o),owner_hash:await sha(LOC.tok),read_hash:await readHash()})})}await idbDel('q',id);n++}}
   catch(e){SYNC.phErr=e.message}finally{PHUP=false}return n}
 function thumbs(ids,max){const l=ids.slice(0,max||12);return l.length?`<div class="thumbs">${l.map(id=>(byId('photos',id)||{}).pdf?`<button type="button" class="th pdf" data-act="photoView" data-id="${esc(id)}">📄<small>${esc(((byId('photos',id)||{}).nom||'PDF').slice(0,18))}</small></button>`:`<button type="button" class="th" data-act="photoView" data-id="${esc(id)}"><img data-ph="${esc(id)}" alt="${esc((byId('photos',id)||{}).leg||'Photo du site')}"></button>`).join('')}${ids.length>l.length?`<span class="small muted">+${ids.length-l.length}</span>`:''}</div>`:''}
 async function fillThumbs(){for(const im of $$('img[data-phf]:not([src])')){const u=await photoUrl(im.dataset.phf,'f');if(u&&im.isConnected)im.src=u}for(const im of $$('img[data-ph]:not([src])')){const u=await photoUrl(im.dataset.ph,'t');if(u&&im.isConnected)im.src=u;else if(im.isConnected)im.replaceWith(Object.assign(document.createElement('span'),{className:'small muted',textContent:'photo non reçue'}))}}
@@ -3514,6 +3531,196 @@ const QICO={vente:'up',ventecredit:'pen',enccli:'wallet',depense:'down',achatcre
 function quickTiles(){const used=new Set();let h=QGRP.map(([g,ks])=>{const l=ks.filter(k=>QUICK[k]);l.forEach(k=>used.add(k));return l.length?`<div class="grp">${g}</div><div class="tiles qt">${l.map(k=>`<button data-act="quick" data-k="${k}">${ico(QICO[k])}${QUICK[k].t}<span>${QUICK[k].s}</span></button>`).join('')}</div>`:''}).join('');
   const rest=Object.keys(QUICK).filter(k=>!used.has(k));if(rest.length||isAdmin())h+=`<div class="grp">Autres</div><div class="tiles qt">${rest.map(k=>`<button data-act="quick" data-k="${k}">${QUICK[k].t}<span>${QUICK[k].s}</span></button>`).join('')}${isAdmin()?`<button data-act="manual">${ico('pen')}Écriture en partie double<span>Débit / crédit libre</span></button>`:''}</div>`;return h}
 
+/* ============ PHASE 0 : FACTURE NORMALISÉE DGI, SAUVEGARDES, KIT DE SECOURS ============ */
+const FN_DEF=[['e-UF','e-UF (plateforme e-DEF gratuite de la DGI)'],['e-MCF','e-MCF (module de contrôle en ligne)'],['MCF','MCF (boîtier relié au logiciel)'],['UF','UF (unité de facturation physique)']];
+const fnOn=()=>D.settings.fnorm==='oui';
+const validFn=f=>!!f&&typeof f==='object'&&typeof f.code==='string'&&f.code.length>=4&&f.code.length<=120&&RX.date.test(f.date||'')&&FN_DEF.some(x=>x[0]===f.def);
+const fnNeeded=d=>fnOn()&&(d.type==='F'||d.type==='A')&&d.st==='E'&&!d.fn&&d.date>=(D.settings.fnDebut||'2025-12-01');
+const fnMissing=()=>live(D.docs).filter(fnNeeded);
+function fnBlock(d){
+  if(d.type==='D'||d.st!=='E')return '';
+  if(d.fn)return `<div class="card fnok"><div class="top"><b>Facture normalisée DGI</b><span class="tag g">Code reporté</span></div><div class="small">Code : <b>${esc(d.fn.code)}</b> · ${esc(d.fn.def)} · émise le ${dfr(d.fn.date)}</div>${isAdmin()?`<button class="ghost" style="margin-top:6px" data-act="fnForm" data-id="${esc(d.id)}">Corriger le code</button>`:''}</div>`;
+  if(!fnOn())return '';
+  return `<div class="card fnko"><div class="top"><b>Facture normalisée DGI à émettre</b><span class="tag r">Sans code</span></div><p class="small">Émettez cette ${d.type==='A'?'facture d\'avoir':'facture'} sur le dispositif électronique fiscal (par exemple l'e-UF de la plateforme e-DEF de la DGI), puis reportez ici le code qu'il donne. Sans ce code, ce document n'est pas une facture normalisée et votre client ne peut pas déduire la TVA.</p>${isAdmin()?`<button class="pr" data-act="fnForm" data-id="${esc(d.id)}">Saisir le code DGI</button>`:''}</div>`;
+}
+function fnPrint(d){
+  if(d.type==='D'||d.st!=='E')return '';
+  if(d.fn)return `<div class="box fnbox"><b>Facture normalisée DGI</b> · dispositif ${esc(d.fn.def)} · code <b>${esc(d.fn.code)}</b> · émise le ${dfr(d.fn.date)}</div>`;
+  return fnOn()?`<p class="small"><b>Document de gestion interne.</b> La facture normalisée correspondante est émise par le dispositif électronique fiscal de la DGI.</p>`:'';
+}
+function fnForm(id){const d=byId('docs',id),f=d.fn||{code:'',def:D.settings.fnDef||'e-UF',date:d.date>today()?today():d.date,ttc:docTot(d).ttc};
+  openSheet(`<h2>Facture normalisée — ${esc(d.num)}</h2><form id="ffn" data-id="${esc(id)}">
+  <label class="f">Code ou numéro de la facture normalisée<input name="code" value="${esc(f.code)}" required minlength="4" maxlength="120" autocomplete="off"></label>
+  <div class="row2"><label class="f">Dispositif<select name="def">${FN_DEF.map(([k,l])=>`<option value="${k}" ${k===f.def?'selected':''}>${esc(l)}</option>`).join('')}</select></label><label class="f">Date d'émission à la DGI<input type="date" name="date" value="${esc(f.date)}" required></label></div>
+  <label class="f">Montant TTC déclaré sur le dispositif (${esc(d.cur)})<input type="number" name="ttc" step="0.01" min="0" value="${esc(f.ttc??docTot(d).ttc)}" required></label>
+  <p class="small muted">Recopiez exactement le code imprimé par le dispositif (code DEF, compteur ou numéro de la facture normalisée). Il figurera sur l'impression de la facture. La facture elle-même reste inchangée et comptabilisée.</p>
+  <div class="btns"><button class="pr" type="submit">Enregistrer</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function saveFn(id,F){const d=JSON.parse(JSON.stringify(byId('docs',id)));
+  const code=String(F.code||'').trim().replace(/\s+/g,' ');if(code.length<4||code.length>120)throw new Error('Code DGI invalide (4 à 120 caractères)');
+  if(!RX.date.test(F.date||''))throw new Error('Date invalide');
+  const dup=live(D.docs).find(x=>x.id!==id&&x.fn&&x.fn.code===code);if(dup)throw new Error('Ce code DGI est déjà reporté sur '+dup.num);
+  const ttc=r2(+F.ttc||0),t=docTot(d).ttc;
+  d.fn={code,def:FN_DEF.some(x=>x[0]===F.def)?F.def:'e-UF',date:F.date,ttc};
+  await commit('docs',d,'facture normalisée',d.num+' → '+code);
+  if(Math.abs(ttc-t)>0.01)setTimeout(()=>toast('Attention : le montant déclaré à la DGI ('+money(ttc,d.cur)+') diffère du TTC de la facture ('+money(t,d.cur)+')'),1200)}
+function fnSettings(S){return `<h3>Facture normalisée DGI</h3>
+  <p class="small muted">Depuis le 1er décembre 2025, toute société assujettie à la TVA doit émettre ses factures par un dispositif électronique fiscal agréé par la DGI. Faites confirmer votre situation par la DGI ou votre avocat conseil.</p>
+  <label class="f">La société est-elle assujettie à la TVA ?<select name="fnorm"><option value="" ${!S.fnorm?'selected':''}>À vérifier</option><option value="oui" ${S.fnorm==='oui'?'selected':''}>Oui : factures normalisées obligatoires</option><option value="non" ${S.fnorm==='non'?'selected':''}>Non</option></select></label>
+  <div class="row2"><label class="f">Obligatoire à partir du<input type="date" name="fnDebut" value="${esc(S.fnDebut||'2025-12-01')}"></label><label class="f">Dispositif utilisé<select name="fnDef">${FN_DEF.map(([k,l])=>`<option value="${k}" ${k===(S.fnDef||'e-UF')?'selected':''}>${esc(l)}</option>`).join('')}</select></label></div>`}
+
+/* ---------- Sauvegardes : copie hebdomadaire sur le serveur, test de restauration ---------- */
+const BK={busy:false,err:'',list:null};
+const gerantsActifs=()=>live(D.users).filter(u=>u.role==='Gérant'&&u.actif!==false&&(u.keys||[]).some(k=>!k.rev));
+async function snapBackup(force){
+  if(!SRV()||!D||!navigator.onLine||BK.busy||!isAdmin())return false;
+  if(!force&&LOC.lastSnap&&NOW()-LOC.lastSnap<7*864e5)return false;
+  BK.busy=true;
+  try{if(!LOC.tok)LOC.tok=b64e(rnd(24));const nb=COLL.reduce((s,c)=>s+live(D[c]||[]).length,0);
+    const payload=await packFile('backup',{D:{...D},from:meU().nom,at:NOW()},LOC.pass);
+    await srvFetch('mgc_backups',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({company:D.settings.cr,device:HDR.dev,by_name:meU().nom,payload,nb,owner_hash:await sha(LOC.tok),read_hash:await readHash()})});
+    LOC.lastSnap=NOW();BK.err='';BK.list=null;scheduleSave();await audit('sauvegarde serveur','*','*',nb+' éléments');return true}
+  catch(e){BK.err=/404|PGRST205|mgc_backups/.test(e.message)?'table des sauvegardes absente : exécutez le script SQL ci-dessous dans Supabase':e.message;throw new Error('Sauvegarde serveur impossible : '+BK.err)}
+  finally{BK.busy=false}
+}
+async function bkList(){const r=await srvFetch(`mgc_backups?company=eq.${encodeURIComponent(D.settings.cr)}&select=id,device,by_name,nb,created_at&order=created_at.desc&limit=20`);BK.list=await r.json();return BK.list}
+async function bkPayload(id){const r=await srvFetch(`mgc_backups?company=eq.${encodeURIComponent(D.settings.cr)}&id=eq.${encodeURIComponent(id)}&select=payload,created_at`);const j=await r.json();if(!j[0])throw new Error('Sauvegarde introuvable');return j[0]}
+async function checkBackup(p){
+  const B=p.D||{},users=B.users||[],res={n:0,ok:0,bad:0,tested:0,cols:[],at:p.at,from:p.from,bal:[0,0],nbE:0};
+  const recs=[];for(const c of COLL){if(c==='log')continue;const a=B[c]||[];const n=a.filter(r=>!r.del).length,cur=live(D[c]||[]).length;if(n||cur)res.cols.push([c,n,cur]);res.n+=n;for(const r of a)recs.push(r)}
+  if(!B.settings||!users.length)throw new Error('Sauvegarde incomplète : réglages ou utilisateurs absents');
+  const sample=recs.length<=1500?recs:Array.from({length:1500},()=>recs[Math.floor(Math.random()*recs.length)]);
+  for(const r of sample){res.tested++;const u=users.find(x=>x.id===r.by),k=u&&(u.keys||[]).find(k=>k.kid===r.kid);if(k&&await verifySig(r,k))res.ok++;else res.bad++}
+  for(const e of B.entries||[])if(!e.del&&e.st==='V'){res.nbE++;for(const l of e.lines||[]){res.bal[0]+=+l.d||0;res.bal[1]+=+l.k||0}}
+  res.bal=res.bal.map(r2);return res}
+const CLAB={users:'Utilisateurs',accounts:'Comptes',tiers:'Clients et fournisseurs',items:'Articles',emps:'Employés',docs:'Factures et devis',entries:'Écritures',pays:'Encaissements',slips:'Bulletins de paie',moves:'Mouvements de stock',projects:'Projets',tasks:'Tâches',photos:'Photos',journ:'Rapports de terrain'};
+async function showCheck(p,src){
+  const r=await checkBackup(p);const okSig=r.bad===0,okBal=Math.abs(r.bal[0]-r.bal[1])<0.01,ok=okSig&&okBal;
+  LOC.lastTest=NOW();scheduleSave();await audit('test de restauration','*','*',`${src} : ${ok?'réussi':'anomalies'} (${r.ok}/${r.tested} signatures)`);
+  openSheet(`<h2>Test de restauration ${ok?'<span class="tag g">Réussi</span>':'<span class="tag r">Anomalies</span>'}</h2>
+  <p>${esc(src)} · faite par <b>${esc(r.from||'?')}</b>${r.at?' le '+esc(new Date(r.at).toLocaleString('fr-FR')):''}</p>
+  <ul><li>Déchiffrement avec le code entreprise : <b class="pos">réussi</b></li>
+  <li>Signatures vérifiées : <b class="${okSig?'pos':'neg'}">${r.ok} sur ${r.tested}</b>${r.tested<r.n?` (échantillon sur ${r.n} éléments)`:''}</li>
+  <li>Écritures validées : ${r.nbE} · débit ${money(r.bal[0])} · crédit ${money(r.bal[1])} : <b class="${okBal?'pos':'neg'}">${okBal?'équilibré':'déséquilibré'}</b></li></ul>
+  <table class="stack"><thead><tr><th>Contenu</th><th class="n">Dans la sauvegarde</th><th class="n">Sur ce téléphone</th></tr></thead><tbody>${r.cols.filter(([c])=>CLAB[c]).map(([c,n,cur])=>`<tr><td>${CLAB[c]}</td><td class="n">${n}</td><td class="n">${cur}</td></tr>`).join('')}</tbody></table>
+  <p class="small muted">Ce test ne modifie rien. Pour restaurer réellement, importez le fichier dans Réglages › Synchronisation › Importer un fichier : seuls les éléments manquants ou plus récents et correctement signés sont ajoutés.</p>
+  <div class="btns"><button class="ghost" data-act="close">Fermer</button></div>`)}
+function bkPanel(){const on=!!SRV(),d=x=>x?esc(new Date(x).toLocaleString('fr-FR')):'jamais';
+  return `<h3>Sauvegardes et restauration</h3>
+  <p class="small muted">${on?'Une copie chiffrée complète est déposée automatiquement chaque semaine sur le serveur par le téléphone du gérant ou du comptable. Ces copies ne peuvent être ni modifiées ni effacées depuis l\'application.':'Activez la synchronisation par serveur ci-dessous pour obtenir une copie automatique chaque semaine.'} Gardez aussi, chaque mois, un fichier « Envoyer mes données » sur Google Drive, hors du serveur.</p>
+  <p class="small">Dernière copie serveur : <b>${d(LOC.lastSnap)}</b> · dernier fichier envoyé : <b>${d(LOC.lastExport)}</b> · dernier test de restauration : <b>${d(LOC.lastTest)}</b>${BK.err?`<br><span class="neg">${esc(BK.err)}</span>`:''}</p>
+  <div class="btns">${on&&isAdmin()?'<button data-act="bkNow">Copie serveur maintenant</button><button class="ghost" data-act="bkList">Copies du serveur</button>':''}<label class="bt">Tester un fichier de sauvegarde<input type="file" id="bkt" accept="*/*" hidden></label>${isGerant()?'<button class="ghost" data-act="pdoc" data-k="secours">Kit de secours à imprimer</button>':''}</div>`}
+function bkListView(l){openSheet(`<h2>Copies du serveur</h2>${l.length?`<table class="stack"><thead><tr><th>Date</th><th>Par</th><th class="n">Éléments</th><th></th></tr></thead><tbody>${l.map(b=>`<tr><td>${esc(new Date(b.created_at).toLocaleString('fr-FR'))}</td><td>${esc(b.by_name||b.device)}</td><td class="n">${esc(b.nb??'')}</td><td><button class="ghost" data-act="bkTest" data-id="${esc(b.id)}">Tester</button> <button class="ghost" data-act="bkGet" data-id="${esc(b.id)}">Télécharger</button></td></tr>`).join('')}</tbody></table>`:'<p class="empty">Aucune copie sur le serveur pour l\'instant.</p>'}
+  <p class="small muted">« Tester » déchiffre la copie et vérifie ses signatures et l'équilibre des comptes sans rien modifier. « Télécharger » donne un fichier que vous pouvez ranger sur Google Drive ou importer.</p><div class="btns"><button class="ghost" data-act="close">Fermer</button></div>`)}
+const SQL_BK=`
+-- Sauvegardes hebdomadaires (ajout de la phase 0) : ajout seulement, ni modification ni effacement
+create table if not exists public.mgc_backups(
+  id bigint generated always as identity primary key,
+  company text not null, device text not null, by_name text,
+  payload text not null check (length(payload) < 30000000),
+  nb int, owner_hash text not null, created_at timestamptz not null default now());
+create index if not exists mgc_backups_co on public.mgc_backups(company, created_at desc);
+alter table public.mgc_backups enable row level security;
+create policy mgcb_lecture on public.mgc_backups for select using (true);
+create policy mgcb_ajout on public.mgc_backups for insert with check (true);
+grant select, insert on public.mgc_backups to anon, authenticated;
+revoke update, delete, truncate on public.mgc_backups from anon, authenticated;`;
+
+/* ---------- Kit de secours (plan de continuité) ---------- */
+PD2.secours=async()=>{const S=D.settings,g=gerantsActifs(),url=location.origin+location.pathname,L='<span style="display:inline-block;min-width:260px;border-bottom:1px solid #999">&nbsp;</span>';
+  return dHead('Kit de secours',`Plan de continuité · ${esc(S.nom)}`)+
+  `<p><b>Document confidentiel.</b> À imprimer en deux exemplaires, compléter <b>à la main</b>, signer, puis mettre sous enveloppe scellée : un exemplaire chez l'avocat conseil, un au coffre de la société. Ne jamais photographier cette page une fois remplie, ni l'envoyer par message.</p>
+  <h2>1. La société et l'application</h2>${TT(['',''],[['Raison sociale',esc(S.nom)],['RCCM · Id. Nat. · NIF',[S.rccm,S.idnat,S.nif].filter(Boolean).map(esc).join(' · ')||'—'],['Adresse de l\'application',esc(url)],['Serveur de synchronisation',S.syncUrl?esc(S.syncUrl):'non activé'],['Dernière copie serveur',LOC.lastSnap?dfr(new Date(LOC.lastSnap).toLocaleDateString('sv-SE')):'aucune'],['Dernier fichier de sauvegarde',LOC.lastExport?dfr(new Date(LOC.lastExport).toLocaleDateString('sv-SE')):'aucun']])}
+  <h2>2. Personnes ayant l'accès gérant</h2>${TT(['Nom','Rôle','Téléphones actifs'],g.map(u=>[esc(u.nom),'Gérant',String(u.keys.filter(k=>!k.rev).length)]))}
+  ${g.length<2?'<p style="color:#B42318"><b>Attention : un seul gérant.</b> Si son téléphone est perdu ou s\'il est indisponible, personne ne peut plus valider, payer ni ajouter d\'utilisateur. Créez dès maintenant un accès gérant pour la co-associée, sur son propre téléphone (Réglages › Utilisateurs › Ajouter, rôle Gérant, puis invitation).</p>':'<p>Au moins deux gérants peuvent reprendre la main l\'un pour l\'autre.</p>'}
+  <h2>3. Codes et comptes (à remplir à la main)</h2>${TT(['Élément','Valeur'],[['Code entreprise (déchiffre toutes les sauvegardes)',L],['Code du coffre',L],['Compte GitHub MupGlobalsarl : identifiant',L],['Compte GitHub : mot de passe',L],['Compte GitHub : codes de récupération',L],['Compte Supabase : e-mail',L],['Compte Supabase : mot de passe',L],['Compte Google Drive des sauvegardes',L],['E-mail et téléphone de récupération',L]])}
+  <h2>4. Procédure de reprise</h2><ol>
+  <li><b>Le gérant est indisponible :</b> le gérant de secours ouvre l'application sur son téléphone et continue normalement ; il peut retirer l'accès d'un téléphone perdu (Réglages › Utilisateurs › Gérer › Révoquer).</li>
+  <li><b>Un téléphone est perdu ou volé :</b> un gérant révoque immédiatement cet appareil, puis crée une invitation pour le nouveau téléphone.</li>
+  <li><b>Les données semblent abîmées :</b> Réglages › Synchronisation › Copies du serveur › Tester, puis Télécharger la dernière copie saine et l'importer. Rien n'est écrasé : seuls les éléments signés manquants sont ajoutés.</li>
+  <li><b>Tous les téléphones des gérants sont perdus :</b> les fichiers de sauvegarde restent lisibles avec le code entreprise, mais aucun nouveau téléphone ne peut signer à leur place. Faire appel au développeur avec ce kit pour reconstituer la société à partir de la dernière sauvegarde.</li>
+  <li><b>Le serveur ou le compte GitHub est perdu :</b> les comptes GitHub et Supabase ci-dessus permettent de rétablir l'adresse de l'application et la synchronisation. Les données ne sont pas perdues : chaque téléphone en garde une copie complète.</li></ol>
+  <h2>5. Contrôles à faire chaque mois</h2><ul><li>Envoyer un fichier « Envoyer mes données » sur Google Drive.</li><li>Faire un test de restauration (Réglages › Synchronisation).</li><li>Vérifier la liste des utilisateurs et révoquer les téléphones qui ne servent plus.</li></ul>
+  <table style="margin-top:22px"><tr><td style="width:33%;height:70px;vertical-align:top">Le gérant<br><br>${esc((g[0]||{}).nom||'')}</td><td style="width:33%;vertical-align:top">La co-associée<br><br></td><td style="vertical-align:top">L'avocat conseil (dépositaire)<br>Date de dépôt :</td></tr></table>`};
+
+/* ============ PHASE 1 : SÉCURITÉ ============ */
+/* ---------- PIN trop simples ---------- */
+function pinWeak(p){p=String(p||'');if(!/^\d+$/.test(p))return false;
+  if(/^(\d{1,3})\1+$/.test(p))return true;
+  const asc='01234567890123456789',dsc='98765432109876543210';if(asc.includes(p)||dsc.includes(p))return true;
+  if(/^(\d)\1{2,}(\d)\2{2,}$/.test(p))return true;
+  return ['112233','121212','131313','123321','654321','696969','147258','159753','789456','456123'].includes(p)}
+let PINWEAK=false;
+
+/* ---------- Déverrouillage renforcé : PIN + empreinte (WebAuthn, extension PRF) ----------
+   La clé des données est chiffrée deux fois : d'abord par une clé que seul le composant sécurisé
+   du téléphone peut recalculer après l'empreinte, ensuite par le PIN. Copier les données du
+   téléphone ne suffit plus : sans l'empreinte, essayer tous les PIN ne mène à rien. */
+const WA_OK=!!(window.PublicKeyCredential&&navigator.credentials&&window.isSecureContext);
+let SESSION_KPRF=null;
+async function waPrf(credB64,saltB64){
+  let a;try{a=await navigator.credentials.get({publicKey:{challenge:rnd(32),allowCredentials:[{type:'public-key',id:b64d(credB64)}],userVerification:'required',timeout:60000,extensions:{prf:{eval:{first:b64d(saltB64)}}}}})}
+  catch(e){throw new Error('Empreinte non confirmée : réessayez')}
+  const r=a&&a.getClientExtensionResults().prf;
+  if(!r||!r.results||!r.results.first)throw new Error('Ce téléphone ne fournit pas la clé matérielle');
+  return crypto.subtle.importKey('raw',new Uint8Array(r.results.first),'AES-GCM',false,['encrypt','decrypt'])}
+const waWrap=async(kek,kp,bytes)=>aesE(kek,kp?enc.encode(JSON.stringify(await aesE(kp,bytes))):bytes);
+async function waUnwrap(h,kek,box,kp){const b=await aesD(kek,box);return h.wa?aesD(kp,JSON.parse(dec.decode(b))):b}
+async function waCheckPin(pin){const h=HDR.users.find(u=>u.id===ME);if(!/^\d{6,}$/.test(pin||''))throw new Error('PIN incorrect');const kek=await kdf(pin,b64d(h.salt));try{await aesD(kek,h.w)}catch(e){throw new Error('PIN incorrect')}return {h,kek}}
+async function waEnable(pin){
+  if(!WA_OK)throw new Error('Ce navigateur ne permet pas la protection par empreinte');
+  const raw=SESSION_RAW,pj=SESSION_PJ;if(!raw||!pj)throw new Error('Session expirée : reconnectez-vous');
+  const {h,kek}=await waCheckPin(pin);if(h.wa)throw new Error('Déjà activée sur ce téléphone');
+  const salt=rnd(32),nom=meU().nom;let c;
+  try{c=await navigator.credentials.create({publicKey:{rp:{name:'MupGlobal Compta'},user:{id:rnd(16),name:nom+' · '+(HDR.company||''),displayName:nom},challenge:rnd(32),
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},timeout:60000,extensions:{prf:{}}}})}
+  catch(e){throw new Error('Empreinte non enregistrée : '+(e.name==='NotAllowedError'?'opération annulée':e.message))}
+  const pr=c.getClientExtensionResults().prf;if(!pr||pr.enabled===false)throw new Error('Ce téléphone ne fournit pas de clé matérielle (extension PRF) : protection impossible. Rien n\'a été modifié.');
+  const cred=b64e(new Uint8Array(c.rawId)),kp=await waPrf(cred,b64e(salt));
+  const w=await waWrap(kek,kp,raw),p=await waWrap(kek,kp,enc.encode(JSON.stringify(pj)));
+  {const t={...h,wa:{cred,salt:b64e(salt)}};if(!(await waUnwrap(t,kek,w,kp)).every((x,i)=>x===raw[i]))throw new Error('Vérification échouée : rien n\'a été modifié')}
+  Object.assign(h,{w,p,wa:{cred,salt:b64e(salt),at:NOW()}});SESSION_KPRF=kp;
+  await audit('protection par empreinte activée','users',ME,nom);await saveNow()}
+async function waDisable(pin){
+  const raw=SESSION_RAW,pj=SESSION_PJ;if(!raw||!pj)throw new Error('Session expirée : reconnectez-vous');
+  const {h,kek}=await waCheckPin(pin);if(!h.wa)return;
+  Object.assign(h,{w:await aesE(kek,raw),p:await aesE(kek,enc.encode(JSON.stringify(pj)))});delete h.wa;SESSION_KPRF=null;
+  await audit('protection par empreinte retirée','users',ME,meU().nom);await saveNow()}
+function waPanel(){const h=HDR.users.find(u=>u.id===ME)||{};
+  return `<h3>Protection renforcée par empreinte</h3>
+  ${h.wa?`<p><span class="tag g">Active</span> depuis le ${esc(new Date(h.wa.at||0).toLocaleDateString('fr-FR'))} : ce téléphone demande votre PIN <b>et</b> votre empreinte (ou le déverrouillage de l'écran).</p>
+  <p class="small muted">Si vous supprimez la clé d'accès « MupGlobal Compta » du gestionnaire de mots de passe, ou réinitialisez le téléphone, ce téléphone ne pourra plus ouvrir ses données : il faudra une nouvelle invitation du gérant et la synchronisation.</p>
+  <div class="btns"><button class="ghost" data-act="waForm" data-v="off">Retirer la protection</button></div>`
+  :WA_OK?`<p class="small">Sans cette protection, quelqu'un qui copie les données du téléphone peut essayer tous les PIN de 6 chiffres sur un ordinateur. Avec elle, la clé des données dépend aussi du composant sécurisé du téléphone : il faut le PIN <b>et</b> votre empreinte.</p>
+  <p class="small muted">Avant d'activer : vérifiez que la synchronisation par serveur ou une sauvegarde récente existe. Le téléphone doit avoir un verrouillage d'écran.</p>
+  <div class="btns"><button class="pr" data-act="waForm" data-v="on">Activer avec mon empreinte</button></div>`
+  :'<p class="small muted">Ouvrez l\'application depuis son adresse internet (https) dans Chrome pour pouvoir activer la protection par empreinte.</p>'}`}
+function waForm(on){openSheet(`<h2>${on?'Activer':'Retirer'} la protection par empreinte</h2><form id="fwa" data-v="${on?'on':'off'}">
+  <label class="f">Votre code PIN<input class="pin" type="password" name="pin" inputmode="numeric" minlength="6" required autocomplete="current-password"></label>
+  <p class="small muted">${on?'Le téléphone va ensuite demander votre empreinte (ou le déverrouillage de l\'écran) deux fois : une fois pour créer la clé, une fois pour la vérifier.':'Après le retrait, le PIN seul ouvrira de nouveau ce téléphone.'}</p>
+  <div class="btns"><button class="pr" type="submit">${on?'Continuer':'Retirer'}</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+
+/* ---------- Serveur : lecture et dépôt réservés aux détenteurs du code entreprise ---------- */
+let RTOK=null;
+const SQL_P1=`
+-- Phase 1 : lecture et dépôt réservés aux téléphones qui connaissent le code entreprise
+alter table public.mgc_sync add column if not exists read_hash text;
+alter table public.mgc_photos add column if not exists read_hash text;
+alter table public.mgc_backups add column if not exists read_hash text;
+create or replace function public.mgc_rh() returns text language sql stable set search_path = '' as $$ select encode(extensions.digest(coalesce(current_setting('request.headers',true)::json->>'x-mgc-read',''),'sha256'),'hex') $$;
+create or replace function public.mgc_oh() returns text language sql stable set search_path = '' as $$ select encode(extensions.digest(coalesce(current_setting('request.headers',true)::json->>'x-mgc-token',''),'sha256'),'hex') $$;
+drop policy if exists mgc_lecture on public.mgc_sync; create policy mgc_lecture on public.mgc_sync for select using (read_hash is null or read_hash = public.mgc_rh());
+drop policy if exists mgc_ajout on public.mgc_sync; create policy mgc_ajout on public.mgc_sync for insert with check (read_hash is null or read_hash = public.mgc_rh());
+drop policy if exists mgc_maj on public.mgc_sync; create policy mgc_maj on public.mgc_sync for update using (owner_hash = public.mgc_oh()) with check (owner_hash = public.mgc_oh() and (read_hash is null or read_hash = public.mgc_rh()));
+drop policy if exists mgcp_lecture on public.mgc_photos; create policy mgcp_lecture on public.mgc_photos for select using (read_hash is null or read_hash = public.mgc_rh());
+drop policy if exists mgcp_ajout on public.mgc_photos; create policy mgcp_ajout on public.mgc_photos for insert with check (read_hash is null or read_hash = public.mgc_rh());
+drop policy if exists mgcp_maj on public.mgc_photos; create policy mgcp_maj on public.mgc_photos for update using (owner_hash = public.mgc_oh()) with check (owner_hash = public.mgc_oh() and (read_hash is null or read_hash = public.mgc_rh()));
+drop policy if exists mgcb_lecture on public.mgc_backups; create policy mgcb_lecture on public.mgc_backups for select using (read_hash is null or read_hash = public.mgc_rh());
+drop policy if exists mgcb_ajout on public.mgc_backups; create policy mgcb_ajout on public.mgc_backups for insert with check (read_hash is null or read_hash = public.mgc_rh());
+revoke delete, truncate on public.mgc_sync, public.mgc_photos from anon, authenticated;`;
+async function readTok(){if(!RTOK){const k=await crypto.subtle.importKey('raw',enc.encode(LOC.pass),'PBKDF2',false,['deriveBits']);
+  RTOK=b64e(new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode('mgc-read|'+D.settings.cr),iterations:100000,hash:'SHA-256'},k,256)))}return RTOK}
+const readHash=async()=>sha(await readTok());
+
 /* ============ PROJETS, TÂCHES ET GANTT ============ */
 const PSTAT=['Prévu','En cours','Suspendu','Terminé'];
 function projStats(p){const ts=live(D.tasks).filter(t=>t.projet===p.id),t=today();const av=ts.length?Math.round(ts.reduce((s,x)=>s+(+x.av||0),0)/ts.length):(p.statut==='Terminé'?100:0);return {ts,av,late:ts.filter(x=>taskLate(x,t)).length}}
@@ -3697,13 +3904,13 @@ const SRV=()=>!DEMO&&D?.settings?.syncUrl&&D.settings.syncKey&&RX.srv.test(D.set
 const SYNC={err:'',busy:false};let pushT=null;
 function schedulePush(){if(!SRV())return;clearTimeout(pushT);pushT=setTimeout(()=>push().catch(e=>{SYNC.err=e.message}),15000)}
 async function srvFetch(path,opt={}){const s=SRV();if(!s)throw new Error('Serveur non configuré');if(!LOC.tok)LOC.tok=b64e(rnd(24));
-  const r=await fetch(s.url+'/rest/v1/'+path,{...opt,headers:{apikey:s.key,Authorization:'Bearer '+s.key,'Content-Type':'application/json','x-mgc-token':LOC.tok,...(opt.headers||{})}});
+  const r=await fetch(s.url+'/rest/v1/'+path,{...opt,headers:{apikey:s.key,Authorization:'Bearer '+s.key,'Content-Type':'application/json','x-mgc-token':LOC.tok,'x-mgc-read':await readTok(),...(opt.headers||{})}});
   if(!r.ok){let t='';try{t=(await r.json()).message||''}catch(e){}throw new Error('Serveur '+r.status+(t?' : '+t:''))}return r}
 async function push(){
   if(!SRV()||!D||!navigator.onLine||SYNC.busy)return;SYNC.busy=true;
   try{if(!LOC.tok)LOC.tok=b64e(rnd(24));const payload=await packFile('sync',{D:{...D},from:meU().nom,at:NOW()},LOC.pass);
-    await srvFetch('mgc_sync?on_conflict=company,device',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({company:D.settings.cr,device:HDR.dev,payload,owner_hash:await sha(LOC.tok),updated_at:new Date().toISOString()})});
-    LOC.lastPush=NOW();SYNC.err='';scheduleSave()}
+    await srvFetch('mgc_sync?on_conflict=company,device',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({company:D.settings.cr,device:HDR.dev,payload,owner_hash:await sha(LOC.tok),read_hash:await readHash(),updated_at:new Date().toISOString()})});
+    LOC.lastPush=NOW();SYNC.err='';scheduleSave();setTimeout(()=>snapBackup().catch(e=>console.warn(e)),4000)}
   finally{SYNC.busy=false}
 }
 async function pull(manual){
@@ -3744,7 +3951,7 @@ create policy mgcp_ajout on public.mgc_photos for insert with check (true);
 create policy mgcp_maj on public.mgc_photos for update
   using (owner_hash = encode(extensions.digest(coalesce(current_setting('request.headers',true)::json->>'x-mgc-token',''),'sha256'),'hex'))
   with check (owner_hash = encode(extensions.digest(coalesce(current_setting('request.headers',true)::json->>'x-mgc-token',''),'sha256'),'hex'));
-grant select, insert, update on public.mgc_photos to anon, authenticated;`;
+grant select, insert, update on public.mgc_photos to anon, authenticated;`+SQL_BK+SQL_P1;
 function srvPanel(){
   const S=D.settings,on=!!SRV();
   const st=on?`<p>État : <b>${SYNC.err?'<span class="neg">erreur — '+esc(SYNC.err)+'</span>':'<span class="pos">actif</span>'}</b> · dernier envoi ${LOC.lastPush?esc(new Date(LOC.lastPush).toLocaleString('fr-FR')):'jamais'} · dernière réception ${LOC.lastSync?esc(new Date(LOC.lastSync).toLocaleString('fr-FR')):'jamais'}</p><div class="btns"><button class="pr" data-act="syncNow">Synchroniser maintenant</button></div>`:'<p class="muted">Non configurée : l\'échange se fait par fichier.</p>';
@@ -3782,6 +3989,12 @@ document.addEventListener('click',ev=>{
     cancelPay:async()=>{const w=window.prompt('Motif de l\'annulation de cet encaissement');if(!w||!w.trim())return;const p=JSON.parse(JSON.stringify(byId('pays',id)));p.rev=await reverse(p.entryId,w.trim());p.st='X';await commit('pays',p,'annulation encaissement',w);render();docView(p.doc)},
     delDoc:async()=>{if(!ask('Supprimer ce brouillon ?'))return;const d=JSON.parse(JSON.stringify(byId('docs',id)));d.del=true;await commit('docs',d,'suppression brouillon',d.num||'');if(d.from){const s=byId('docs',d.from);if(s&&s.conv){const c=JSON.parse(JSON.stringify(s));c.conv=false;await commit('docs',c)}}closeSheet();render()},
     printDoc:()=>doPrint(docHTML(byId('docs',id))),
+    fnForm:()=>fnForm(id),
+    waForm:()=>waForm(b.dataset.v==='on'),
+    bkNow:async()=>{toast('Copie en cours…');await snapBackup(true);render();toast('Copie chiffrée déposée sur le serveur')},
+    bkList:async()=>bkListView(await bkList()),
+    bkTest:async()=>{const b=await bkPayload(id);const {p}=await unpackFile(b.payload,LOC.pass);await showCheck(p,'Copie serveur du '+new Date(b.created_at).toLocaleString('fr-FR'))},
+    bkGet:async()=>{const b=await bkPayload(id);download(`MupGlobal-Compta_sauvegarde_${String(b.created_at).slice(0,10)}.mgc`,b.payload,'application/json');toast('Fichier téléchargé : importez-le pour restaurer')},
     shareDoc:()=>{const t=docText(byId('docs',id));if(navigator.share)navigator.share({text:t}).catch(()=>{});else navigator.clipboard?.writeText(t).then(()=>toast('Texte copié'),()=>toast('Copie impossible'))},
     tiers:()=>tiersForm(id),item:()=>itemForm(id),move:()=>moveForm(k),
     cancelMove:async()=>{if(!ask('Annuler ce mouvement ? Son écriture d\'achat sera contrepassée.'))return;const m=JSON.parse(JSON.stringify(byId('moves',id)));if(!stockOK(m.item,D.moves.filter(x=>x.id!==id)))throw new Error('Impossible : le stock deviendrait négatif');if(m.entryId&&isAdmin()){m.rev=await reverse(m.entryId,'annulation mouvement de stock')}else if(m.entryId)throw new Error('Mouvement avec écriture : réservé au gérant ou au comptable');m.st='X';await commit('moves',m,'annulation mouvement','');render()},
@@ -3924,6 +4137,7 @@ document.addEventListener('change',e=>{
   if(t.id==='yearSel'){const y=+t.value;if(y>=2000&&y<=2100){UI.year=y;saveUI();render()}}
   if(t.id==='empph'&&t.files[0]){fileToJpeg(t.files[0],220,0.72).then(o=>{const b=new Blob([o.a],{type:'image/jpeg'}),fr=new FileReader();fr.onload=()=>{$('#fe [name=photo]').value=fr.result;const av=t.closest('div').querySelector('img,span');if(av)av.outerHTML=`<img src="${fr.result}" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover">`};fr.readAsDataURL(b)}).catch(e=>toast(e.message))}
   if((t.id==='logo'||t.id==='sig')&&t.files[0])imgToData(t.files[0],400,d=>run(async()=>{const s=JSON.parse(JSON.stringify(D.settings));s[t.id==='logo'?'logo':'signature']=d;await commitSettings(s,t.id==='logo'?'logo':'signature','');render();toast('Image enregistrée')}));
+  if(t.id==='bkt'&&t.files[0]){const nm=t.files[0].name,r=new FileReader();r.onload=()=>run(async()=>{const {p}=await unpackFile(r.result,LOC.pass);await showCheck(p,'Fichier '+nm)});r.readAsText(t.files[0]);t.value=''}
   if(t.id==='imp'&&t.files[0]){const r=new FileReader();r.onload=()=>run(()=>importSync(r.result));r.readAsText(t.files[0])}
   if(t.id==='joinFile'&&t.files[0]){const r=new FileReader();r.onload=()=>run(()=>joinStart(r.result));r.readAsText(t.files[0])}
 });
@@ -4028,7 +4242,9 @@ async function submitForm(f,F){switch(f.id){
     case 'ftask':await saveTask(f,F);break;
     case 'frole':{const id=f.dataset.id;const r=id?JSON.parse(JSON.stringify(byId('roles',id))):{id:'r_'+uid()};r.nom=F.nom.trim().slice(0,40);if(ROLES.includes(r.nom))throw new Error('Nom réservé');r.perms={};for(const [p] of PERMS)if(F['p_'+p])r.perms[p]=true;await commit('roles',r,id?'modification rôle':'nouveau rôle',r.nom);closeSheet();render();toast('Rôle enregistré');break}
     case 'fclose':{const m=F.m;if(!ask('Clôturer définitivement jusqu\'au '+dfr(lastDay(m))+' ? Cette action est irréversible.'))return;await closePeriod(m);render();toast('Période clôturée');break}
-    case 'fset':{const s=JSON.parse(JSON.stringify(D.settings));for(const k of ['nom','adresse','rccm','idnat','nif','tel','email','mentions','annexe'])s[k]=(F[k]||'').slice(0,500);for(const k of ['taux','tva','cnssSal','cnssPat','inpp','onem','iprFam','iprFamMax','seuil1','seuil2','seuilTreso','tolRetard','cgMois','cgAnc'])s[k]=Math.max(0,+F[k]||0);if(F.feries!==undefined)s.feries=String(F.feries).slice(0,1500);s.matin=!!F.matin;if(s.seuil2>0&&validators().length<2)throw new Error('La double validation exige au moins deux utilisateurs ayant le droit de valider. Ajoutez d\'abord un comptable.');if(!(s.taux>0))throw new Error('Taux invalide');s.tvaDefaut=!!F.tvaDefaut;await commitSettings(s,'réglages','');render();toast('Réglages enregistrés');break}
+    case 'fwa':{if(f.dataset.v==='on'){await waEnable(F.pin);toast('Protection par empreinte activée')}else{await waDisable(F.pin);toast('Protection par empreinte retirée')}closeSheet();render();break}
+    case 'ffn':{await saveFn(f.dataset.id,F);closeSheet();render();docView(f.dataset.id);toast('Code de facture normalisée enregistré');break}
+    case 'fset':{const s=JSON.parse(JSON.stringify(D.settings));for(const k of ['nom','adresse','rccm','idnat','nif','tel','email','mentions','annexe'])s[k]=(F[k]||'').slice(0,500);for(const k of ['taux','tva','cnssSal','cnssPat','inpp','onem','iprFam','iprFamMax','seuil1','seuil2','seuilTreso','tolRetard','cgMois','cgAnc'])s[k]=Math.max(0,+F[k]||0);if(F.feries!==undefined)s.feries=String(F.feries).slice(0,1500);s.matin=!!F.matin;if(s.seuil2>0&&validators().length<2)throw new Error('La double validation exige au moins deux utilisateurs ayant le droit de valider. Ajoutez d\'abord un comptable.');if(!(s.taux>0))throw new Error('Taux invalide');s.tvaDefaut=!!F.tvaDefaut;if(F.fnorm!==undefined){s.fnorm=['oui','non'].includes(F.fnorm)?F.fnorm:'';s.fnDebut=RX.date.test(F.fnDebut||'')?F.fnDebut:'2025-12-01';s.fnDef=FN_DEF.some(x=>x[0]===F.fnDef)?F.fnDef:'e-UF'}await commitSettings(s,'réglages','');render();toast('Réglages enregistrés');break}
   }}
 function exportCSV(){
   const t=sub.etat,num=n=>String(r2(n)).replace('.',',');let rows=[];
