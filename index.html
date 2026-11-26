@@ -2817,7 +2817,7 @@ function acFor(){if(!D)return AC.accueil;
   if(view==='projet'){const p=byId('projects',sub.pid);return p&&p.kind==='chantier'?(isPeint(p)?ACT_AC.peint:ACT_AC.elec):AC.projets}
   return AC[view]||AC.accueil}
 /* ============ ALERTE DE MISE À JOUR (comme MupSOLAR) ============ */
-const APP_BUILD='202611260756',APP_NEWS=[["Facture normalisée DGI : code e-UF à reporter sur chaque facture émise, filtre « Sans code DGI » et mention à l'impression", "factures", {}, "#app .seg"], ["Sauvegardes : copie chiffrée chaque semaine sur le serveur, et test de restauration sans rien modifier", "reglages", {"reg": "sync"}, "#app h3"], ["Kit de secours à imprimer et déposer chez l'avocat : codes, comptes et procédure de reprise", "reglages", {"reg": "sync"}, "#app h3"], ["Protection par empreinte : le PIN et l'empreinte sont demandés pour ouvrir l'application", "reglages", {"reg": "securite"}, "#app h3"], ["PIN trop simples refusés ; serveur réservé aux téléphones qui ont le code entreprise", "reglages", {"reg": "securite"}, "#app h3"]];
+const APP_BUILD='202611260916',APP_NEWS=[["Test de restauration : tableau Contenu, Copie, Téléphone lisible sur téléphone", "reglages", {"reg": "sync"}, "#app h3"]];
 const APP_URL='https://mupglobalsarl.github.io/mupglobal-compta/',UPD_ONLINE=location.protocol==='https:'&&/mupglobalsarl\.github\.io$/i.test(location.hostname);
 const UPD_SNOOZE=(DEMO?'mgc_demo':'mgc')+'_upd_snooze',UPD_SEEN='mgc_build_seen';
 var UPD_AFTER=false;const UPD_OLD=(()=>{try{return !localStorage.getItem(UPD_SEEN)&&!!localStorage.getItem(SKEY)}catch(e){return false}})();let updShown=false,updLast=0;
@@ -3601,7 +3601,7 @@ async function showCheck(p,src){
   <ul><li>Déchiffrement avec le code entreprise : <b class="pos">réussi</b></li>
   <li>Signatures vérifiées : <b class="${okSig?'pos':'neg'}">${r.ok} sur ${r.tested}</b>${r.tested<r.n?` (échantillon sur ${r.n} éléments)`:''}</li>
   <li>Écritures validées : ${r.nbE} · débit ${money(r.bal[0])} · crédit ${money(r.bal[1])} : <b class="${okBal?'pos':'neg'}">${okBal?'équilibré':'déséquilibré'}</b></li></ul>
-  <table class="stack"><thead><tr><th>Contenu</th><th class="n">Dans la sauvegarde</th><th class="n">Sur ce téléphone</th></tr></thead><tbody>${r.cols.filter(([c])=>CLAB[c]).map(([c,n,cur])=>`<tr><td>${CLAB[c]}</td><td class="n">${n}</td><td class="n">${cur}</td></tr>`).join('')}</tbody></table>
+  <table><thead><tr><th>Contenu</th><th class="n">Copie</th><th class="n">Téléphone</th></tr></thead><tbody>${r.cols.filter(([c])=>CLAB[c]).map(([c,n,cur])=>`<tr><td>${CLAB[c]}</td><td class="n">${n}</td><td class="n">${cur}</td></tr>`).join('')}</tbody></table>
   <p class="small muted">Ce test ne modifie rien. Pour restaurer réellement, importez le fichier dans Réglages › Synchronisation › Importer un fichier : seuls les éléments manquants ou plus récents et correctement signés sont ajoutés.</p>
   <div class="btns"><button class="ghost" data-act="close">Fermer</button></div>`)}
 function bkPanel(){const on=!!SRV(),d=x=>x?esc(new Date(x).toLocaleString('fr-FR')):'jamais';
@@ -3708,14 +3708,14 @@ alter table public.mgc_photos add column if not exists read_hash text;
 alter table public.mgc_backups add column if not exists read_hash text;
 create or replace function public.mgc_rh() returns text language sql stable set search_path = '' as $$ select encode(extensions.digest(coalesce(current_setting('request.headers',true)::json->>'x-mgc-read',''),'sha256'),'hex') $$;
 create or replace function public.mgc_oh() returns text language sql stable set search_path = '' as $$ select encode(extensions.digest(coalesce(current_setting('request.headers',true)::json->>'x-mgc-token',''),'sha256'),'hex') $$;
-drop policy if exists mgc_lecture on public.mgc_sync; create policy mgc_lecture on public.mgc_sync for select using (read_hash is null or read_hash = public.mgc_rh());
-drop policy if exists mgc_ajout on public.mgc_sync; create policy mgc_ajout on public.mgc_sync for insert with check (read_hash is null or read_hash = public.mgc_rh());
-drop policy if exists mgc_maj on public.mgc_sync; create policy mgc_maj on public.mgc_sync for update using (owner_hash = public.mgc_oh()) with check (owner_hash = public.mgc_oh() and (read_hash is null or read_hash = public.mgc_rh()));
-drop policy if exists mgcp_lecture on public.mgc_photos; create policy mgcp_lecture on public.mgc_photos for select using (read_hash is null or read_hash = public.mgc_rh());
-drop policy if exists mgcp_ajout on public.mgc_photos; create policy mgcp_ajout on public.mgc_photos for insert with check (read_hash is null or read_hash = public.mgc_rh());
-drop policy if exists mgcp_maj on public.mgc_photos; create policy mgcp_maj on public.mgc_photos for update using (owner_hash = public.mgc_oh()) with check (owner_hash = public.mgc_oh() and (read_hash is null or read_hash = public.mgc_rh()));
-drop policy if exists mgcb_lecture on public.mgc_backups; create policy mgcb_lecture on public.mgc_backups for select using (read_hash is null or read_hash = public.mgc_rh());
-drop policy if exists mgcb_ajout on public.mgc_backups; create policy mgcb_ajout on public.mgc_backups for insert with check (read_hash is null or read_hash = public.mgc_rh());
+drop policy if exists mgc_lecture on public.mgc_sync; create policy mgc_lecture on public.mgc_sync for select using read_hash = public.mgc_rh();
+drop policy if exists mgc_ajout on public.mgc_sync; create policy mgc_ajout on public.mgc_sync for insert with check read_hash = public.mgc_rh();
+drop policy if exists mgc_maj on public.mgc_sync; create policy mgc_maj on public.mgc_sync for update using (owner_hash = public.mgc_oh()) with check (owner_hash = public.mgc_oh() and read_hash = public.mgc_rh());
+drop policy if exists mgcp_lecture on public.mgc_photos; create policy mgcp_lecture on public.mgc_photos for select using read_hash = public.mgc_rh();
+drop policy if exists mgcp_ajout on public.mgc_photos; create policy mgcp_ajout on public.mgc_photos for insert with check read_hash = public.mgc_rh();
+drop policy if exists mgcp_maj on public.mgc_photos; create policy mgcp_maj on public.mgc_photos for update using (owner_hash = public.mgc_oh()) with check (owner_hash = public.mgc_oh() and read_hash = public.mgc_rh());
+drop policy if exists mgcb_lecture on public.mgc_backups; create policy mgcb_lecture on public.mgc_backups for select using read_hash = public.mgc_rh();
+drop policy if exists mgcb_ajout on public.mgc_backups; create policy mgcb_ajout on public.mgc_backups for insert with check read_hash = public.mgc_rh();
 revoke delete, truncate on public.mgc_sync, public.mgc_photos from anon, authenticated;`;
 async function readTok(){if(!RTOK){const k=await crypto.subtle.importKey('raw',enc.encode(LOC.pass),'PBKDF2',false,['deriveBits']);
   RTOK=b64e(new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode('mgc-read|'+D.settings.cr),iterations:100000,hash:'SHA-256'},k,256)))}return RTOK}
