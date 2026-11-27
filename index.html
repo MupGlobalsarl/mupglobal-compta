@@ -830,7 +830,7 @@ async function setupNew(F){
   HDR={v:2,dev,company:F.nom,users:[{id:user.id,nom:user.nom,salt:b64e(salt),w:await aesE(kek,raw),p:await aesE(kek,enc.encode(JSON.stringify(kp.privJwk))),kid:kp.kid,fails:0}],data:null};
   D=emptyD();LOC={pass:F.pass,code:'A',chain:{seq:0,h:'0'}};
   await commit('users',user,'création de l\'entreprise',user.nom);
-  await commitSettings({nom:F.nom.trim(),adresse:'Lubumbashi, Haut-Katanga, RDC',rccm:'',idnat:'',nif:'',tel:'',email:'',base:F.base,taux:+F.taux,tva:16,tvaDefaut:false,cnssSal:5,cnssPat:13,inpp:3,onem:0.2,mentions:'Paiement par virement, mobile money ou en espèces.',logo:'',signature:'',lock:'',closings:[]},'initialisation');
+  await commitSettings({syncUrl:DEMO?'':SRV_DEF.url,syncKey:DEMO?'':SRV_DEF.key,nom:F.nom.trim(),adresse:'Lubumbashi, Haut-Katanga, RDC',rccm:'',idnat:'',nif:'',tel:'',email:'',base:F.base,taux:+F.taux,tva:16,tvaDefaut:false,cnssSal:5,cnssPat:13,inpp:3,onem:0.2,mentions:'Paiement par virement, mobile money ou en espèces.',logo:'',signature:'',lock:'',closings:[]},'initialisation');
   for(const [c,l] of PCG)await commit('accounts',{id:c,code:c,lib:l},null,null,{noAudit:true});
   const acts=['Ferme – maraîchage','Poulets de chair','Électricité & solaire','Coupe et couture','Peinture','Frais généraux'];
   for(let i=0;i<acts.length;i++)await commit('acts',{id:'act'+i,nom:acts[i]},null,null,{noAudit:true});
@@ -2827,7 +2827,7 @@ function acFor(){if(!D)return AC.accueil;
   if(view==='projet'){const p=byId('projects',sub.pid);return p&&p.kind==='chantier'?(isPeint(p)?ACT_AC.peint:ACT_AC.elec):AC.projets}
   return AC[view]||AC.accueil}
 /* ============ ALERTE DE MISE À JOUR (comme MupSOLAR) ============ */
-const APP_BUILD='202611280022',APP_NEWS=[["L'application s'appelle désormais MupGlobal ERP : gestion intégrale de l'entreprise", "accueil", {}, "header h1"], ["Le logo de MupGlobal SARL apparaît en haut de l'écran, à l'accueil et à l'écran de déverrouillage", "accueil", {}, ".welc2 .wlogo"], ["Nouvelle icône avec le logo de l'entreprise. Si l'ancienne reste affichée, supprimez l'icône et réinstallez l'application depuis Chrome (vos données restent)", "accueil", {}, "header .brand"]];
+const APP_BUILD='202611280043',APP_NEWS=[["Synchronisation serveur déjà configurée : l'adresse et la clé du serveur MupGlobal sont intégrées, plus rien à saisir", "reglages", {"reg": "sync"}, "#fsrv"], ["Toute nouvelle entreprise démarre avec la synchronisation active ; seul le code entreprise est demandé", "reglages", {"reg": "sync"}, "#fsrv"], ["Pour ajouter un PC : créez une invitation sur le téléphone, puis choisissez « Rejoindre » sur le PC (pas « Créer l'entreprise »)", "reglages", {"reg": "users"}, "#app .btns"]];
 const APP_URL='https://mupglobalsarl.github.io/mupglobal-compta/',UPD_ONLINE=location.protocol==='https:'&&/mupglobalsarl\.github\.io$/i.test(location.hostname);
 const UPD_SNOOZE=(DEMO?'mgc_demo':'mgc')+'_upd_snooze',UPD_SEEN='mgc_build_seen';
 var UPD_AFTER=false;const UPD_OLD=(()=>{try{return !localStorage.getItem(UPD_SEEN)&&!!localStorage.getItem(SKEY)}catch(e){return false}})();let updShown=false,updLast=0;
@@ -4187,6 +4187,8 @@ async function saveRec(){
 }
 
 /* ============ SYNCHRONISATION SERVEUR (chiffrée de bout en bout) ============ */
+/* Serveur de MupGlobal SARL : adresse et clé publiques, intégrées pour ne rien avoir à saisir. Les données restent chiffrées avec le code entreprise. */
+const SRV_DEF={url:'https://lvordrmfdfcadbpczesx.supabase.co',key:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2b3Jkcm1mZGZjYWRicGN6ZXN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyNzMwNDYsImV4cCI6MjExMDg0OTA0Nn0.XeyNZvDwMK9dKk5FJcTfexIthg_XYTVv5fOvrSRVkx0'};
 const SRV=()=>!DEMO&&D?.settings?.syncUrl&&D.settings.syncKey&&RX.srv.test(D.settings.syncUrl)?{url:D.settings.syncUrl,key:D.settings.syncKey}:null;
 const SYNC={err:'',busy:false};let pushT=null;
 function schedulePush(){if(!SRV())return;clearTimeout(pushT);pushT=setTimeout(()=>push().catch(e=>{SYNC.err=e.message}),15000)}
@@ -4243,7 +4245,7 @@ function srvPanel(){
   const S=D.settings,on=!!SRV();
   const st=on?`<p>État : <b>${SYNC.err?'<span class="neg">erreur — '+esc(SYNC.err)+'</span>':'<span class="pos">actif</span>'}</b> · dernier envoi ${LOC.lastPush?esc(new Date(LOC.lastPush).toLocaleString('fr-FR')):'jamais'} · dernière réception ${LOC.lastSync?esc(new Date(LOC.lastSync).toLocaleString('fr-FR')):'jamais'}</p><div class="btns"><button class="pr" data-act="syncNow">Synchroniser maintenant</button></div>`:'<p class="muted">Non configurée : l\'échange se fait par fichier.</p>';
   return `<p class="small muted">Le serveur ne reçoit que des fichiers chiffrés avec le code entreprise : il ne peut ni lire ni modifier vos comptes. Chaque téléphone envoie ses données 15 secondes après une modification et récupère celles des autres chaque minute, dès qu'il y a internet. Les mêmes contrôles qu'à l'import s'appliquent.</p>${st}
-  ${isGerant()?`<form id="fsrv"><label class="f">Adresse du projet Supabase<input name="url" value="${esc(S.syncUrl||'')}" placeholder="https://votreprojet.supabase.co" inputmode="url"></label><label class="f">Clé publique (anon)<input name="key" value="${esc(S.syncKey||'')}" autocomplete="off"></label>
+  ${isGerant()?`<form id="fsrv"><details ${S.syncUrl&&S.syncUrl!==SRV_DEF.url?'open':''}><summary class="small">Serveur : ${esc((S.syncUrl||SRV_DEF.url).replace('https://',''))}${(S.syncUrl||SRV_DEF.url)===SRV_DEF.url?' (serveur MupGlobal, déjà renseigné)':''}</summary><label class="f">Adresse du projet Supabase<input name="url" value="${esc(S.syncUrl||SRV_DEF.url)}" placeholder="https://votreprojet.supabase.co" inputmode="url"></label><label class="f">Clé publique (anon)<input name="key" value="${esc(S.syncKey||SRV_DEF.key)}" autocomplete="off"></label></details>
   <div class="btns"><button type="submit">${on?'Mettre à jour':'Activer'}</button>${on?'<button type="button" class="ghost" data-act="srvOff">Désactiver</button>':''}</div></form>
   <details><summary class="small">Script d'installation de la table (à exécuter une fois dans Supabase, menu SQL)</summary><pre style="font-size:12px;white-space:pre-wrap;background:var(--pn);padding:10px;border-radius:4px">${esc(SQL)}</pre><button class="ghost" data-act="copySQL">Copier le script</button></details>`:''}`;
 }
