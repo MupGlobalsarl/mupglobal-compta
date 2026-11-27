@@ -1,4 +1,4 @@
-const C='mgcompta-v4-17';
+const C='mgcompta-v4-18';
 const F=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
 // Installation : copie fraîche (sans le cache HTTP) de l'application
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(F.map(u=>new Request(u,{cache:'reload'})))));self.skipWaiting()});

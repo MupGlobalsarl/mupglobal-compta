@@ -294,6 +294,8 @@ header h1 small{display:flex;align-items:center;gap:6px}.dot{width:8px;height:8p
 .onp>div>img,.onp>div>span:first-child{flex:none}
 .fnok{border-left:4px solid var(--mg-ok,#287A45)}.fnko{border-left:4px solid #B42318;background:light-dark(#fff6f5,#2a1414)}
 .doc .fnbox{margin:10px 0;border:1.5px solid #174A7E;padding:8px 10px;font-size:12.5px}
+.bpi{padding:10px 12px}.bpi.err{border-left:4px solid #B42318}.bpi.warn{border-left:4px solid #B7791F}.bpi.info{border-left:4px solid #64748b}
+.bpi label.chk{display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-weight:600}.bpi label.chk input{-webkit-appearance:checkbox;appearance:auto;width:20px;height:20px;min-width:20px;flex:0 0 20px;margin:0;padding:0;accent-color:#174A7E}
 </style>
 <script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
 </head>
@@ -2817,7 +2819,7 @@ function acFor(){if(!D)return AC.accueil;
   if(view==='projet'){const p=byId('projects',sub.pid);return p&&p.kind==='chantier'?(isPeint(p)?ACT_AC.peint:ACT_AC.elec):AC.projets}
   return AC[view]||AC.accueil}
 /* ============ ALERTE DE MISE À JOUR (comme MupSOLAR) ============ */
-const APP_BUILD='202611260953',APP_NEWS=[["Démarrage immédiat : l'application s'ouvre depuis le téléphone sans attendre internet, même avec un réseau faible", "accueil", {}, "#app"]];
+const APP_BUILD='202611272309',APP_NEWS=[["Business plans : importez votre plan Excel (.xlsx). Chaque formule est recalculée, les erreurs et incohérences sont signalées avec leur correction", "bplan", {}, "#app .btns"], ["Corrections au choix : apport minimum ou avec réserve, montants des investissements à zéro, puis téléchargement de l'Excel corrigé", "bplan", {}, "#app .btns"], ["Le Gantt du fichier devient un projet avec ses tâches et leurs dates", "bplan", {}, "#app .btns"]];
 const APP_URL='https://mupglobalsarl.github.io/mupglobal-compta/',UPD_ONLINE=location.protocol==='https:'&&/mupglobalsarl\.github\.io$/i.test(location.hostname);
 const UPD_SNOOZE=(DEMO?'mgc_demo':'mgc')+'_upd_snooze',UPD_SEEN='mgc_build_seen';
 var UPD_AFTER=false;const UPD_OLD=(()=>{try{return !localStorage.getItem(UPD_SEEN)&&!!localStorage.getItem(SKEY)}catch(e){return false}})();let updShown=false,updLast=0;
@@ -3008,7 +3010,8 @@ function bpCalc(b){const H=+b.horizon||5,h=b.hyp||{},inv=(b.invest||[]).reduce((
   const y1=ys[0]||{},sr=cv<1?r2((+h.fixes||0)/(1-cv)):null;return {ys,inv,van,tri,dr,sr,pm:sr&&y1.ca?Math.round(sr/y1.ca*365):null,t0}}
 function bpView(){if(!perm('bp'))return '<h2>Business plans</h2><p class="muted">Votre rôle ne donne pas accès aux business plans.</p>';const bs=live(D.bps).sort((a,b)=>b.upd-a.upd);
   return `<h2>Business plans</h2><p class="muted">Un business plan par activité, par projet ou pour une nouvelle activité : le texte, les investissements, le financement et les prévisions sur 3 à 5 ans, avec la rentabilité (VAN, TRI, délai de récupération, seuil de rentabilité). Il se pré-remplit avec le réalisé de l'activité et s'imprime en PDF pour la banque ou les associés.</p>
-  <div class="btns"><button class="pr" data-act="bpNew">+ Nouveau business plan</button></div>
+  <div class="btns"><button class="pr" data-act="bpNew">+ Nouveau business plan</button><label class="bt">Importer un plan Excel (.xlsx)<input type="file" id="bpimp" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label></div>
+  <p class="small muted">L'import relit chaque formule du fichier, signale les erreurs de calcul et les incohérences, propose les corrections, puis crée le business plan et peut redonner le fichier Excel corrigé.</p>
   ${bs.map(b=>{const c=bpCalc(b);return `<div class="card" data-act="bpOpen" data-id="${esc(b.id)}" style="cursor:pointer"><div class="top"><b>${esc(b.titre)}</b><span class="tag ${c.van>=0?'g':'r'}">VAN ${money(c.van)}</span></div><div class="small muted">${esc(bpCible(b))} · ${b.horizon} ans · investissement ${money(c.inv)}${c.tri!==null?' · TRI '+fmt(c.tri)+' %':''}${c.dr!==null?' · récupéré en '+fmt(c.dr)+' an(s)':''}</div></div>`}).join('')}`}
 function bpCible(b){const c=b.cible||{};return c.t==='act'?'Activité : '+actNom(c.id):c.t==='proj'?'Projet : '+((byId('projects',c.id)||{}).nom||''):'Nouvelle activité'}
 async function bpNew(){const a=live(D.acts)[0];const b={id:uid(),titre:'Business plan — '+(a?a.nom:'nouvelle activité'),cible:{t:'act',id:a?.id||''},horizon:5,date:today(),sec:{},invest:[],fin:{apport:0,emprunt:0,taux:18,duree:3,subv:0},hyp:{ca1:0,g:10,cv:45,fixes:0,inf:8,bfrj:30,is:30,mini:1,actu:15}};await commit('bps',b,'business plan',b.titre);bpOpen(b.id)}
@@ -3018,7 +3021,7 @@ function bpOpen(id){const b=byId('bps',id),c=bpCalc(b),h=b.hyp,f=b.fin,N=(k,l,v,
   <div class="row2"><label class="f">Porte sur<select name="cible"><option value='{"t":"new"}'>Nouvelle activité</option>${live(D.acts).map(a=>`<option value='${esc(JSON.stringify({t:'act',id:a.id}))}' ${b.cible.t==='act'&&b.cible.id===a.id?'selected':''}>Activité : ${esc(a.nom)}</option>`).join('')}${live(D.projects).map(p=>`<option value='${esc(JSON.stringify({t:'proj',id:p.id}))}' ${b.cible.t==='proj'&&b.cible.id===p.id?'selected':''}>Projet : ${esc(p.nom)}</option>`).join('')}</select></label><label class="f">Horizon<select name="horizon">${[3,5].map(x=>`<option ${+b.horizon===x?'selected':''}>${x}</option>`).join('')}</select></label></div>
   <details open><summary><b>Rentabilité</b></summary><div class="kpis"><div class="kpi"><div class="l">Investissement</div><div class="v">${money(c.inv)}</div></div><div class="kpi"><div class="l">VAN à ${fmt(h.actu)} %</div><div class="v ${c.van<0?'neg':''}">${money(c.van)}</div></div><div class="kpi"><div class="l">TRI</div><div class="v">${c.tri===null?'—':fmt(c.tri)+' %'}</div></div><div class="kpi"><div class="l">Délai de récupération</div><div class="v">${c.dr===null?'au-delà de l\'horizon':fmt(c.dr)+' an(s)'}</div></div><div class="kpi"><div class="l">Seuil de rentabilité (an 1)</div><div class="v">${c.sr===null?'—':money(c.sr)}</div><div class="small muted">${c.pm?'atteint vers le jour '+c.pm:''}</div></div></div>
   <div class="scroll"><table><thead><tr><th></th>${c.ys.map(y=>`<th class="n">An ${y.n}</th>`).join('')}</tr></thead><tbody>${[['Chiffre d\'affaires','ca'],['Charges variables','cvn'],['Charges fixes','fx'],['Excédent brut d\'exploitation','ebe'],['Amortissements','dot'],['Intérêts','it'],['Impôt','imp'],['Résultat net','rn'],['Capacité d\'autofinancement','caf'],['Trésorerie fin d\'année','tr']].map(([l,k])=>`<tr class="${['ebe','rn','tr'].includes(k)?'sub':''}"><td>${l}</td>${c.ys.map(y=>`<td class="n ${y[k]<0?'neg':''}">${fmt(y[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>
-  ${bpExtra(b,id)}<details><summary><b>Hypothèses</b></summary><div class="btns"><button type="button" data-act="bpFill" data-id="${esc(id)}">Pré-remplir avec le réalisé des 12 derniers mois</button></div><div class="row2">${N('ca1','Chiffre d\'affaires année 1',h.ca1)}${N('g','Croissance annuelle du CA (%)',h.g)}${N('cv','Charges variables (% du CA)',h.cv)}${N('fixes','Charges fixes année 1',h.fixes)}${N('inf','Hausse annuelle des charges fixes (%)',h.inf)}${N('bfrj','Besoin en fonds de roulement (jours de CA)',h.bfrj)}${N('is','Impôt sur les bénéfices (%)',h.is)}${N('mini','Minimum d\'impôt (% du CA)',h.mini)}${N('actu','Taux d\'actualisation (%)',h.actu)}</div><p class="small muted">Faites confirmer les taux d'impôt par votre comptable.</p></details>
+  ${bpImpBlock(b)}${bpExtra(b,id)}<details><summary><b>Hypothèses</b></summary><div class="btns"><button type="button" data-act="bpFill" data-id="${esc(id)}">Pré-remplir avec le réalisé des 12 derniers mois</button></div><div class="row2">${N('ca1','Chiffre d\'affaires année 1',h.ca1)}${N('g','Croissance annuelle du CA (%)',h.g)}${N('cv','Charges variables (% du CA)',h.cv)}${N('fixes','Charges fixes année 1',h.fixes)}${N('inf','Hausse annuelle des charges fixes (%)',h.inf)}${N('bfrj','Besoin en fonds de roulement (jours de CA)',h.bfrj)}${N('is','Impôt sur les bénéfices (%)',h.is)}${N('mini','Minimum d\'impôt (% du CA)',h.mini)}${N('actu','Taux d\'actualisation (%)',h.actu)}</div><p class="small muted">Faites confirmer les taux d'impôt par votre comptable.</p></details>
   <details><summary><b>Investissements</b></summary><div id="bpinv">${[...(b.invest||[]),{},{}].map(x=>`<div class="row2" style="grid-template-columns:2fr 1fr 70px"><input name="ides" value="${esc(x.des||'')}" placeholder="Désignation"><input type="number" name="imt" value="${esc(x.mt||'')}" placeholder="Montant"><input type="number" name="idu" value="${esc(x.duree||'')}" placeholder="ans"></div>`).join('')}</div><p class="small muted">Durée d'amortissement en années.</p></details>
   <details><summary><b>Financement</b></summary><div class="row2">${N('apport','Apport des associés',f.apport)}${N('subv','Subvention',f.subv)}${N('emprunt','Emprunt',f.emprunt)}${N('taux','Taux de l\'emprunt (%)',f.taux)}${N('duree','Durée de l\'emprunt (ans)',f.duree,1)}</div></details>
   ${BPS.map(([k,l])=>`<details><summary><b>${l}</b></summary><textarea name="s_${k}" rows="5" maxlength="4000" style="width:100%">${esc((b.sec||{})[k]||'')}</textarea></details>`).join('')}
@@ -3721,6 +3724,282 @@ async function readTok(){if(!RTOK){const k=await crypto.subtle.importKey('raw',e
   RTOK=b64e(new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode('mgc-read|'+D.settings.cr),iterations:100000,hash:'SHA-256'},k,256)))}return RTOK}
 const readHash=async()=>sha(await readTok());
 
+/* ============ IMPORT D'UN BUSINESS PLAN EXCEL : LECTURE, VÉRIFICATION, CORRECTIONS ============ */
+/* ---------- ZIP : lecture et écriture (le .xlsx est une archive zip) ---------- */
+function zipRead(buf){const u8=new Uint8Array(buf),dv=new DataView(buf);let e=u8.length-22;while(e>=0&&dv.getUint32(e,true)!==0x06054b50)e--;
+  if(e<0)throw new Error('Fichier non reconnu : choisissez un classeur Excel (.xlsx)');
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const files={};
+  for(let i=0;i<n;i++){if(dv.getUint32(p,true)!==0x02014b50)throw new Error('Classeur Excel endommagé');
+    const meth=dv.getUint16(p+10,true),csz=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+    const name=new TextDecoder().decode(u8.subarray(p+46,p+46+nl)),st=off+30+dv.getUint16(off+26,true)+dv.getUint16(off+28,true);
+    files[name]={meth,data:u8.subarray(st,st+csz)};p+=46+nl+xl+cl}
+  return files}
+async function zipBytes(f){if(!f)return null;if(f.meth===0)return f.data;if(f.meth!==8)throw new Error('Compression du classeur non prise en charge');
+  return new Uint8Array(await new Response(new Blob([f.data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())}
+const zipText=async f=>{const b=await zipBytes(f);return b?new TextDecoder().decode(b):null};
+const CRCT=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc32=u=>{let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=CRCT[(c^u[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0};
+function zipWrite(list){const te=new TextEncoder(),parts=[],cen=[];let off=0;
+  for(const {name,data} of list){const nb=te.encode(name),crc=crc32(data),h=new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(12,0x21,true);h.setUint32(14,crc,true);h.setUint32(18,data.length,true);h.setUint32(22,data.length,true);h.setUint16(26,nb.length,true);
+    parts.push(new Uint8Array(h.buffer),nb,data);
+    const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(14,0x21,true);c.setUint32(16,crc,true);c.setUint32(20,data.length,true);c.setUint32(24,data.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+    cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+data.length}
+  const cs=cen.reduce((s,x)=>s+x.length,0),e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,list.length,true);e.setUint16(10,list.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...cen,new Uint8Array(e.buffer)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
+
+/* ---------- Lecture du classeur ---------- */
+const xdoc=t=>new DOMParser().parseFromString(t,'application/xml');
+const xk=(el,n)=>Array.from(el.getElementsByTagNameNS('*',n));
+const colN=s=>{let n=0;for(const ch of s)n=n*26+ch.charCodeAt(0)-64;return n};
+const colL=n=>{let s='';while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=(n-m-1)/26}return s};
+const A1=a=>{const m=/^\$?([A-Z]{1,3})\$?(\d+)$/.exec(a||'');return m?{c:colN(m[1]),r:+m[2]}:null};
+const REFRX=/((?:'(?:[^']|'')+'|[A-Za-z_][\w.]*)!)?(\$?)([A-Z]{1,3})(\$?)(\d+)(?![\w(])/g;
+function shiftF(f,dr,dc){let out='',last=0;const q=/"(?:[^"]|"")*"/g;let m;const segs=[];while((m=q.exec(f)))segs.push([m.index,m.index+m[0].length]);
+  return f.replace(REFRX,(all,sh,dc$,col,dr$,row,idx)=>{if(segs.some(([a,b])=>idx>=a&&idx<b))return all;if(idx>0&&/[A-Za-z_\d.]/.test(f[idx-1])&&!sh)return all;
+    return (sh||'')+dc$+(dc$?col:colL(colN(col)+dc))+dr$+(dr$?row:(+row+dr))})}
+async function xlsxRead(buf,name){
+  const z=zipRead(buf),T=p=>zipText(z[p]);if(!z['xl/workbook.xml'])throw new Error('Ce fichier n\'est pas un classeur Excel (.xlsx)');
+  const wb=xdoc(await T('xl/workbook.xml')),rels=xdoc(await T('xl/_rels/workbook.xml.rels')),rmap={};
+  for(const r of xk(rels,'Relationship'))rmap[r.getAttribute('Id')]=r.getAttribute('Target');
+  const stT=await T('xl/styles.xml'),fills=[],xfF=[];if(stT){const sd=xdoc(stT);for(const fl of xk(xk(sd,'fills')[0]||sd,'fill')){const pf=xk(fl,'patternFill')[0],fg=pf&&xk(pf,'fgColor')[0];fills.push(pf&&pf.getAttribute('patternType')==='solid'&&fg?(fg.getAttribute('rgb')||('theme'+(fg.getAttribute('theme')||'')+':'+(fg.getAttribute('tint')||0))):null)}
+    for(const xf of xk(xk(sd,'cellXfs')[0]||sd,'xf'))xfF.push(+xf.getAttribute('fillId')||0)}
+  const ssT=await T('xl/sharedStrings.xml'),ss=ssT?xk(xdoc(ssT),'si').map(si=>xk(si,'t').map(t=>t.textContent).join('')):[];
+  const sheets=[];
+  for(const s of xk(wb,'sheet')){const rid=s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')||s.getAttribute('r:id'),tg=rmap[rid]||'';
+    const path=tg.startsWith('/')?tg.slice(1):'xl/'+tg.replace(/^\.\//,'');const txt=await T(path);if(!txt)continue;
+    const x=xdoc(txt),cells=new Map(),shared={},fill=new Map();let mr=0,mc=0;
+    for(const c of xk(x,'c')){const r=c.getAttribute('r'),t=c.getAttribute('t'),fe=xk(c,'f')[0],ve=xk(c,'v')[0],at=A1(r);if(!at)continue;{const st=c.getAttribute('s'),fc=st!==null?fills[xfF[+st]]:null;if(fc)fill.set(r,fc)}let v=ve?ve.textContent:null,f=null;
+      if(t==='s')v=ss[+v]??'';else if(t==='inlineStr')v=xk(c,'t').map(e=>e.textContent).join('');else if(t==='b')v=v==='1';else if(t==='e')v={err:v};else if(t==='str')v=v??'';else if(v!==null&&v!=='')v=+v;else v=null;
+      if(fe){if(fe.getAttribute('t')==='shared'){const si=fe.getAttribute('si');if(fe.textContent){shared[si]={f:fe.textContent,at};f=fe.textContent}else if(shared[si])f=shiftF(shared[si].f,at.r-shared[si].at.r,at.c-shared[si].at.c)}else f=fe.textContent}
+      if(v===null&&f===null)continue;cells.set(r,{v,f});mr=Math.max(mr,at.r);mc=Math.max(mc,at.c)}
+    sheets.push({name:s.getAttribute('name'),path,cells,mr,mc,fill})}
+  if(!sheets.length)throw new Error('Aucune feuille lisible dans ce classeur');
+  return {name,z,sheets}}
+const cloneW=W=>({...W,sheets:W.sheets.map(s=>({...s,cells:new Map([...s.cells].map(([k,c])=>[k,{...c}]))}))});
+
+/* ---------- Recalcul des formules ---------- */
+const XLU=()=>Object.assign(new Error('formule non prise en charge'),{unsup:true});
+const XTOK=/\s*(?:(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|("(?:[^"]|"")*")|([A-Z][A-Z0-9.]*)\s*\(|((?:'(?:[^']|'')+'|[A-Za-z_][\w.]*)!)?(\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?)|(TRUE|FALSE)|(<>|<=|>=|[-+*/^&=<>%(),;]))/y;
+function xlEval(W){const memo=new Map(),busy=new Set();
+  const sIdx=(n,si)=>{if(!n)return si;n=n.slice(0,-1).replace(/^'(.*)'$/,'$1').replace(/''/g,"'");const i=W.sheets.findIndex(s=>s.name===n);if(i<0)throw XLU();return i};
+  function val(si,a){const k=si+'!'+a;if(memo.has(k))return memo.get(k);const c=W.sheets[si].cells.get(a);let v=c?c.v:null;
+    if(c&&c.f!=null&&!c.unsup){if(busy.has(k))return c.v;busy.add(k);try{v=calc(c.f,si)}catch(e){if(e.unsup){c.unsup=true;v=c.v}else v={err:'#VALUE!'}}busy.delete(k)}
+    memo.set(k,v);return v}
+  const isE=x=>x&&typeof x==='object'&&'err' in x;
+  const num=x=>{if(isE(x))throw x;if(x===null||x===undefined||x==='')return 0;if(typeof x==='boolean')return x?1:0;if(typeof x==='number')return x;const n=+String(x).replace(',','.');if(String(x).trim()===''||isNaN(n))throw {err:'#VALUE!'};return n};
+  const flat=a=>Array.isArray(a)?a:[a];
+  function calc(f,si){const s=f.replace(/^=/,''),T=[];let i=0;
+    while(i<s.length){XTOK.lastIndex=i;const m=XTOK.exec(s);if(!m){if(/\s/.test(s[i])){i++;continue}throw XLU()}i=XTOK.lastIndex;
+      if(m[1])T.push({t:'n',v:+m[1]});else if(m[2])T.push({t:'s',v:m[2].slice(1,-1).replace(/""/g,'"')});else if(m[3])T.push({t:'f',v:m[3]});else if(m[5])T.push({t:'r',v:m[5],sh:m[4]});else if(m[6])T.push({t:'n',v:m[6]==='TRUE'?1:0});else if(m[7])T.push({t:'o',v:m[7]});else if(/^\s+$/.test(m[0]))continue;else throw XLU()}
+    let p=0;const pk=()=>T[p],eat=v=>{if(T[p]&&T[p].t==='o'&&T[p].v===v){p++;return true}return false};
+    const rng=(tk)=>{const k=sIdx(tk.sh,si),[a,b]=tk.v.replace(/\$/g,'').split(':');if(!b)return val(k,a);const A=A1(a),B=A1(b);if((B.r-A.r+1)*(B.c-A.c+1)>20000)throw XLU();const out=[];for(let r=Math.min(A.r,B.r);r<=Math.max(A.r,B.r);r++)for(let c=Math.min(A.c,B.c);c<=Math.max(A.c,B.c);c++)out.push(val(k,colL(c)+r));return out};
+    const F={SUM:a=>a.flat().reduce((s,x)=>typeof x==='number'?s+x:isE(x)?(()=>{throw x})():s,0),
+      AVERAGE:a=>{const v=a.flat().filter(x=>typeof x==='number');if(!v.length)throw {err:'#DIV/0!'};return v.reduce((s,x)=>s+x,0)/v.length},
+      MIN:a=>Math.min(...a.flat().filter(x=>typeof x==='number')),MAX:a=>Math.max(...a.flat().filter(x=>typeof x==='number')),
+      COUNT:a=>a.flat().filter(x=>typeof x==='number').length,PRODUCT:a=>a.flat().filter(x=>typeof x==='number').reduce((s,x)=>s*x,1),
+      ROUND:a=>{const d=num(a[1]??0),m=Math.pow(10,d);return Math.round(num(a[0])*m)/m},ROUNDUP:a=>{const m=Math.pow(10,num(a[1]??0)),x=num(a[0]);return Math.sign(x)*Math.ceil(Math.abs(x)*m-1e-9)/m},
+      ROUNDDOWN:a=>{const m=Math.pow(10,num(a[1]??0)),x=num(a[0]);return Math.sign(x)*Math.floor(Math.abs(x)*m+1e-9)/m},ABS:a=>Math.abs(num(a[0])),
+      SUMPRODUCT:a=>{const L=a.map(flat);return L[0].reduce((s,_,i)=>s+L.reduce((q,l)=>q*(typeof l[i]==='number'?l[i]:0),1),0)}};
+    function prim(){const t=T[p++];if(!t)throw XLU();
+      if(t.t==='n'||t.t==='s')return t.v;if(t.t==='r')return rng(t);
+      if(t.t==='o'&&t.v==='('){const v=expr();if(!eat(')'))throw XLU();return v}
+      if(t.t==='o'&&(t.v==='-'||t.v==='+')){const v=unary();return t.v==='-'?-num(v):num(v)}
+      if(t.t==='f'){const nm=t.v,args=[];if(!eat(')')){do{args.push(expr())}while(eat(',')||eat(';'));if(!eat(')'))throw XLU()}
+        if(nm==='IF')return (typeof args[0]==='string'?args[0]!=='':num(args[0]))?args[1]??true:args[2]??false;
+        if(nm==='IFERROR')return isE(args[0])?args[1]:args[0];
+        if(!F[nm])throw XLU();return F[nm](args)}
+      throw XLU()}
+    const unary=()=>{const t=pk();if(t&&t.t==='o'&&(t.v==='-'||t.v==='+')){p++;const v=unary();return t.v==='-'?-num(v):num(v)}let v=prim();while(eat('%'))v=num(v)/100;return v};
+    const pow=()=>{let v=unary();while(eat('^'))v=Math.pow(num(v),num(unary()));return v};
+    const mul=()=>{let v=pow();for(;;){if(eat('*'))v=num(v)*num(pow());else if(eat('/')){const d=num(pow());if(d===0)return {err:'#DIV/0!'};v=num(v)/d}else return v}};
+    const add=()=>{let v=mul();for(;;){if(eat('+'))v=num(v)+num(mul());else if(eat('-'))v=num(v)-num(mul());else if(eat('&'))v=String(v??'')+String(mul()??'');else return v}};
+    function expr(){let v=add();const t=pk();if(t&&t.t==='o'&&['=','<>','<','>','<=','>='].includes(t.v)){p++;const w=add(),a=typeof v==='number'?v:v,b=w;return t.v==='='?a==b:t.v==='<>'?a!=b:t.v==='<'?a<b:t.v==='>'?a>b:t.v==='<='?a<=b:a>=b}return v}
+    try{const v=expr();if(p<T.length)throw XLU();return Array.isArray(v)?v[0]:v}catch(e){if(e&&e.unsup)throw e;if(isE(e))return e;throw e}}
+  return {val,reset:()=>memo.clear()}}
+
+/* ---------- Repères dans les feuilles ---------- */
+const bpNorm=s=>String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[’']/g,"'").toUpperCase();
+const xnum=v=>typeof v==='number'&&isFinite(v);
+function bpGrid(W,E){return W.sheets.map((sh,si)=>{const rows={};for(const [a,c] of sh.cells){const at=A1(a);(rows[at.r]=rows[at.r]||{})[at.c]={a,c,v:c.f!=null?E.val(si,a):c.v}}
+  const lab=r=>{const R=rows[r]||{};for(let c=1;c<=3;c++){const x=R[c];if(x&&typeof x.v==='string'&&x.v.trim()&&!/^\s*[-—]?\s*$/.test(x.v)&&!/^\s*\d+[a-z]?\s*$/i.test(x.v))return x.v}return ''};
+  const isHdr=r=>{const R=rows[r]||{};return Object.values(R).filter(x=>typeof x.v==='string'&&x.v.trim()).length>=3&&!Object.values(R).some(x=>x.c.f!=null)};
+  const hdr=(r,c)=>{for(let q=r;q>0;q--)if(isHdr(q)){const x=(rows[q]||{})[c];return x&&typeof x.v==='string'?x.v:''}return ''};
+  const hrow=r=>{for(let q=r;q>0;q--)if(isHdr(q))return q;return 0};
+  const sig=r=>{const R=rows[r]||{};if(R[1]&&xnum(R[1].v)||R[1]&&/^\d+$/.test(String(R[1].v).trim()))return 'num';if(R[1]&&/^\d+[a-z]$/i.test(String(R[1].v).trim()))return 'sub';const m=/^\s*([-–•(+)]+)/.exec(lab(r));return m?m[1]:''};
+  return {si,name:sh.name,rows,lab,hdr,hrow,sig,mr:sh.mr,mc:sh.mc}})}
+const AMT=/^(PT\b|CA TOTAL|MONTANT|TOTAL\b|PRIX TOTAL|COUT TOTAL)/;
+function amtCol(G,r){const R=G.rows[r]||{},cols=Object.keys(R).map(Number).filter(c=>xnum(R[c].v)&&c>1);
+  const good=cols.filter(c=>AMT.test(bpNorm(G.hdr(r,c)).trim())&&!/%/.test(G.hdr(r,c)));return good.length?good[good.length-1]:cols.filter(c=>!/%|QTE|KG|SAC|\bHA\b|NB|DUREE/.test(bpNorm(G.hdr(r,c)))).pop()}
+function bpFind(GS,rx,not){for(const G of GS)for(let r=1;r<=G.mr;r++){const L=bpNorm(G.lab(r));if(rx.test(L)&&!(not&&not.test(L)))return {G,r}}return null}
+
+/* ---------- Contrôles ---------- */
+function bpChecks(W,E){const GS=bpGrid(W,E),out=[],fN=v=>xnum(v)?fmt(r2(v)):String(v),ref=(G,a)=>`${G.name} › ${a}`;
+  const add=(lvl,G,a,msg,fix)=>out.push({lvl,where:G?ref(G,a):'',msg,fix:fix?{si:G.si,a,...fix}:null});
+  // 1. Résultats enregistrés différents du calcul, valeurs d'erreur
+  let stale=[];for(const G of GS)for(const [a,c] of W.sheets[G.si].cells){if(c.f==null)continue;const x=E.val(G.si,a);
+    if(x&&typeof x==='object'&&'err' in x)add('err',G,a,`La formule renvoie une erreur (${x.err}) : vérifiez les cellules qu'elle utilise.`);
+    else if(xnum(x)&&xnum(c.v)&&Math.abs(x-c.v)>Math.max(0.01,Math.abs(c.v)*1e-6))stale.push([G,a,c.v,x])}
+  for(const [G,a,v,x] of stale.slice(0,8))add('err',G,a,`Le chiffre affiché (${fN(v)}) ne correspond pas au calcul de sa formule (${fN(x)}) : le fichier n'a pas été recalculé.`,{recalc:true,desc:`Remplacer par ${fN(x)}`});
+  if(stale.length>8)out.push({lvl:'err',where:'',msg:`Et ${stale.length-8} autre(s) chiffre(s) non recalculé(s).`,fix:null});
+  // 2. Totaux qui oublient des lignes
+  for(const G of GS)for(let r=1;r<=G.mr;r++){if(!/TOTAL/.test(bpNorm(G.lab(r))))continue;for(const x of Object.values(G.rows[r]||{})){const m=/^=?\s*SUM\(\$?([A-Z]{1,3})\$?(\d+):\$?([A-Z]{1,3})\$?(\d+)\)\s*$/i.exec(x.c.f||'');if(!m||m[1]!==m[3])continue;
+    const c=colN(m[1]),a=+m[2],b=+m[4],inR=[];for(let q=a;q<=b;q++)inR.push(G.sig(q));const main=inR.filter(Boolean).sort((p,q)=>inR.filter(v=>v===q).length-inR.filter(v=>v===p).length)[0];if(!main)continue;
+    const miss=[];for(let q=b+1;q<r;q++){const y=(G.rows[q]||{})[c];if(y&&xnum(y.v)&&G.sig(q)===main)miss.push(q)}for(let q=a-1;q>0;q--){const y=(G.rows[q]||{})[c];if(!(y&&xnum(y.v))||G.sig(q)!==main)break;miss.push(q)}
+    if(miss.length){const lo=Math.min(a,...miss),hi=Math.max(b,...miss),nf=`SUM(${m[1]}${lo}:${m[1]}${hi})`;add('err',G,x.a,`Le total « ${G.lab(r).trim()} » oublie ${miss.length>1?'les lignes':'la ligne'} ${miss.map(q=>q+' ('+G.lab(q).trim()+')').join(', ')}.`,{f:nf,desc:`Formule =${nf}`})}}}
+  // 3. Quantités saisies à la main alors qu'un total existe
+  const totals=[];for(const G of GS)for(let r=1;r<=G.mr;r++)if(/TOTAL/.test(bpNorm(G.lab(r))))for(const x of Object.values(G.rows[r]||{}))if(x.c.f!=null&&xnum(x.v)&&x.v>=20)totals.push({G,x,r});
+  for(const G of GS)for(let r=1;r<=G.mr;r++){if(/TOTAL/.test(bpNorm(G.lab(r))))continue;for(const [c,x] of Object.entries(G.rows[r]||{})){if(x.c.f!=null||!xnum(x.v)||x.v<20||!/QTE|QUANTIT|\bNB\b|NOMBRE/.test(bpNorm(G.hdr(r,+c))))continue;
+    const t=totals.find(t=>Math.abs(t.x.v-x.v)<1e-9&&!(t.G===G&&t.r===r));if(t){const rf=(t.G===G?'':`'${t.G.name.replace(/'/g,"''")}'!`)+t.x.a,hd=String(t.G.hdr(t.r,A1(t.x.a).c)).split('\n')[0].trim();add('info',G,x.a,`« ${G.lab(r).trim()} » : ${fmtQ(x.v)} est tapé à la main, alors que c'est exactement le total « ${hd} » de « ${t.G.lab(t.r).trim()} » (${t.G.name} › ${t.x.a}). Si la production change, cette ligne ne suivra pas.`,{f:rf,desc:`Lier à ${t.x.a} (=${rf})`})}}}
+  // 4. Trésorerie négative
+  for(const G of GS){let fin=null,ini=null;for(let r=1;r<=G.mr;r++){const L=bpNorm(G.lab(r));if(/SOLDE.*(FINAL|FIN DE|CUMUL)|TRESORERIE FIN/.test(L))fin=fin||r;if(/SOLDE INITIAL|TRESORERIE DEBUT|SOLDE DE DEPART/.test(L))ini=ini||r}
+    if(!fin)continue;const R=G.rows[fin]||{},cs=Object.keys(R).map(Number).filter(c=>c>1&&xnum(R[c].v)&&!/TOTAL|CONTROLE/.test(bpNorm(G.hdr(fin,c))));if(!cs.length)continue;
+    let mi=Infinity,mc=0;for(const c of cs)if(R[c].v<mi){mi=R[c].v;mc=c}
+    if(mi<-0.005){const mois=String(G.hdr(fin,mc)).split('\n')[0].trim(),I=ini&&(G.rows[ini]||{})[Math.min(...cs)],need=Math.ceil((I?I.v-mi:-mi)/100)*100;
+      let why='';if(I&&I.c.f){const m=/'?([^'!]+)'?!\$?([A-Z]+)\$?(\d+)/.exec(I.c.f)||/^=?\$?([A-Z]+)\$?(\d+)$/.exec(I.c.f);if(m){const G2=m.length===4?GS.find(g=>g.name===m[1]):G,rr=+(m.length===4?m[3]:m[2]);if(G2)why=` L'apport de départ est repris de « ${G2.lab(rr).trim()} » : il ne couvre pas les investissements ni l'attente des premières ventes.`}}
+      let dec=0;for(let r=1;r<=G.mr;r++)if(/TOTAL DECAISSEMENT|TOTAL DES DEPENSES|TOTAL SORTIES/.test(bpNorm(G.lab(r)))){const R2=G.rows[r]||{},v=cs.map(c=>R2[c]&&xnum(R2[c].v)?R2[c].v:0);dec=v.reduce((a,b)=>a+b,0)/cs.length;break}
+      const need2=dec?Math.ceil((need+dec)/100)*100:0;
+      add('err',G,R[mc].a,`La trésorerie devient négative en ${mois} (${fN(mi)}) : l'argent manque ce mois-là.${why}`,I?{v:need2||need,opts:[[need,'Minimum'],...(need2?[[need2,'Réserve 1 mois']]:[])],desc:`Porter l'apport de départ (${I.a}) de ${fN(I.v)} à :`}:null);
+      if(I)out[out.length-1].fix.a=I.a}}
+  // 5. Investissements à zéro
+  {const f=bpFind(GS,/^(\d+\.\s*)?.*(INVESTISSEMENT|CAPEX|IMMOBILIS)/,/TOTAL/);if(f){const {G,r}=f;for(let q=r+1;q<=G.mr;q++){const L=bpNorm(G.lab(q));if(/TOTAL/.test(L)||(!L&&q>r+3))break;if(G.sig(q)!=='num')continue;const c=amtCol(G,q);const x=c&&(G.rows[q]||{})[c];if(x&&x.v===0){const R=G.rows[q]||{},cs2=Object.keys(R).map(Number),pu=cs2.find(c=>/^(PU\b|PRIX UNIT)/.test(bpNorm(G.hdr(q,c)).trim())),qt=cs2.filter(c=>/QTE|QUANTIT|ITERATION|\bNB\b|NOMBRE/.test(bpNorm(G.hdr(q,c)))&&xnum(R[c].v)).reduce((m,c)=>m*R[c].v,1);
+      add('warn',G,x.a,`« ${G.lab(q).trim()} » est à 0 : à chiffrer ou à retirer. S'il est nécessaire, l'investissement réel sera plus élevé que prévu.`,{amt:true,a2:pu&&qt>0&&x.c.f?R[pu].a:x.a,q:pu&&qt>0&&x.c.f?qt:1,desc:'Montant total prévu, si vous le connaissez :'});out[out.length-1].fix.a=out[out.length-1].fix.a2}}}}
+  // 6. Nombres dans les libellés
+  const lblHit=(G,r,n,kw)=>{for(const G2 of GS)for(let q=1;q<=G2.mr;q++){if(G2===G&&q===r)continue;const L2=bpNorm(G2.lab(q)).split(/[^A-Z]+/);if(!kw.some(w=>L2.includes(w)))continue;
+      const qc=Object.entries(G2.rows[q]||{}).find(([c,x])=>xnum(x.v)&&/QTE|QUANTIT/.test(bpNorm(G2.hdr(q,+c))));if(qc&&qc[1].v>0)return {G2,q,x:qc[1]}}return null};
+  for(const G of GS)for(let r=1;r<=G.mr;r++){const L=G.lab(r),m=/\((\d[\d\s]*)\)/.exec(L);if(!m)continue;const n=+m[1].replace(/\s/g,''),kw=bpNorm(L.slice(0,m.index)).split(/[^A-Z]+/).filter(w=>w.length>=4&&!/^(TOTAL|DONT|AVEC|POUR)$/.test(w));
+    const h=lblHit(G,r,n,kw);if(!h||h.x.v===n)continue;const cell=Object.values(G.rows[r]).find(x=>x.v===L),nl=L.replace(m[0],'('+h.x.v+')');
+    add('warn',G,cell?cell.a:'',`Le libellé « ${L.trim()} » annonce ${fmtQ(n)}, mais « ${h.G2.lab(h.q).trim()} » en prévoit ${fmtQ(h.x.v)} (${h.G2.name} › ${h.x.a}).`,cell?{text:nl,desc:`Corriger le libellé en « ${nl.trim()} »`}:null)}
+  // 7. Durée du cycle et mois cités
+  {let cyc=0;for(const G of GS)for(let r=1;r<=G.mr;r++)for(const x of Object.values(G.rows[r]||{}))if(typeof x.v==='string'){const m=/CYCLE\s*:?\s*(\d+)\s*MOIS/.exec(bpNorm(x.v));if(m)cyc=cyc||+m[1]}
+    if(cyc)for(const G of GS)for(let r=1;r<=G.mr;r++)for(const x of Object.values(G.rows[r]||{}))if(typeof x.v==='string'){const ms=[...bpNorm(x.v).matchAll(/\bM(\d{1,2})\b/g)].map(m=>+m[1]).filter(k=>k>cyc);if(ms.length)add('warn',G,x.a,`« ${x.v.trim()} » cite le mois ${ms[0]}, alors que le cycle annoncé dure ${cyc} mois : les ventes de ce mois ne sont pas dans la trésorerie.`)}}
+  // 8. Colonnes de contrôle
+  for(const G of GS)for(let r=1;r<=G.mr;r++)for(const [c,x] of Object.entries(G.rows[r]||{}))if(xnum(x.v)&&Math.abs(x.v)>0.005&&/CONTROLE|ECART/.test(bpNorm(G.hdr(r,+c))))add('err',G,x.a,`La colonne de contrôle montre un écart de ${fN(x.v)} sur « ${G.lab(r).trim()} » : les deux tableaux ne concordent pas.`);
+  // 9. Oublis fréquents
+  const all=GS.flatMap(G=>Object.keys(G.rows).map(r=>bpNorm(G.lab(+r))));
+  if(all.some(L=>/AVANT IMPOT/.test(L))&&!all.some(L=>/IMPOT(?!.*AVANT)|\bIBP\b|IMPOSITION/.test(L.replace(/AVANT IMPOT/g,''))))out.push({lvl:'info',where:'',msg:'Aucun impôt sur le bénéfice n\'est prévu. Le business plan créé l\'appliquera avec les taux par défaut de l\'application (30 %, minimum 1 % du chiffre d\'affaires) : faites confirmer votre régime par votre comptable.',fix:null});
+  if(!all.some(L=>/IMPREVU|ALEAS|RESERVE/.test(L)))out.push({lvl:'info',where:'',msg:'Aucune réserve pour imprévus. On prévoit souvent 5 à 10 % des charges pour les pertes, les retards et les hausses de prix.',fix:null});
+  const ord={err:0,warn:1,info:2};return out.map((x,i)=>[x,i]).sort((a,b)=>ord[a[0].lvl]-ord[b[0].lvl]||a[1]-b[1]).map(x=>x[0])}
+
+/* ---------- Extraction des chiffres ---------- */
+function bpExtract(W,E){const GS=bpGrid(W,E),txt=GS.flatMap(G=>Object.values(G.rows).flatMap(R=>Object.values(R).map(x=>String(x.v??'')))).join(' '),N=bpNorm(txt);
+  const cur=/USD|\$/.test(N)?'USD':/\bCDF\b|\bFC\b|FRANC/.test(N)?'CDF':BASE(),cyc=(/CYCLE\s*:?\s*(\d+)\s*MOIS/.exec(N)||[])[1];
+  const tot=(rx,not)=>{const f=bpFind(GS,rx,not);if(!f)return null;const c=amtCol(f.G,f.r);return c?{v:f.G.rows[f.r][c].v,G:f.G,r:f.r,c}:null};
+  const lines=t=>{if(!t)return [];const {G,r,c}=t,h=G.hrow(r-1),out=[];for(let q=h+1;q<r;q++){const x=(G.rows[q]||{})[c],L=G.lab(q).trim();if(x&&xnum(x.v)&&L){const dc=Object.keys(G.rows[q]).map(Number).find(k=>/DUREE/.test(bpNorm(G.hdr(q,k))));out.push([L,r2(x.v),dc?+G.rows[q][dc].v||0:0])}}return out};
+  const T={inv:tot(/TOTAL.*(INVESTISSEMENT|CAPEX|IMMOBILIS)/),ca:tot(/TOTAL.*(VENTE|CHIFFRE D'AFFAIRE|RECETTE)/)||tot(/^.*(CHIFFRE D'AFFAIRES|PRODUITS D'EXPLOITATION)/),intr:tot(/TOTAL.*(INTRANT|MATIERE|ACHAT)/),rh:tot(/TOTAL.*(PERSONNEL|SALAIRE|\bRH\b)/),
+    dopex:tot(/TOTAL.*CHARGES?.*(DIVERS|OPERATIONNEL)/,/D'EXPLOITATION/),ch:tot(/TOTAL CHARGES D'EXPLOITATION/),ebe:tot(/EXCEDENT BRUT|\bEBE\b/),dot:tot(/DOTATION|AMORTISSEMENT/,/TOTAL|INVEST/),res:tot(/RESULTAT NET/)};
+  const v=k=>T[k]?r2(T[k].v):0;
+  let treso=null,apport=0;{const G=GS.find(G=>[1,2,3].some(r=>/TRESORERIE/.test(bpNorm(G.lab(r))))&&G!==(T.ca||{}).G);if(G){let h=0;for(let r=1;r<=Math.min(G.mr,10);r++){const R=G.rows[r]||{};if(Object.keys(R).filter(c=>+c>1&&typeof R[c].v==='string'&&R[c].v.trim()).length>=3){h=r;break}}
+    if(h){const cols=Object.keys(G.rows[h]).map(Number).filter(c=>c>1&&!/TOTAL|CONTROLE/.test(bpNorm(G.rows[h][c].v))).sort((a,b)=>a-b);treso={cols:cols.map(c=>String(G.rows[h][c].v).split('\n')[0].trim()),rows:[]};
+      for(let r=h+1;r<=G.mr&&treso.rows.length<20;r++){const L=G.lab(r).trim();if(!L)continue;const vals=cols.map(c=>{const x=(G.rows[r]||{})[c];return x&&xnum(x.v)?r2(x.v):null});if(vals.some(x=>x!==null))treso.rows.push([L,...vals]);if(/SOLDE INITIAL|TRESORERIE DEBUT/.test(bpNorm(L))&&vals[0]!==null)apport=vals[0]}}}}
+  const titre=(GS[0].lab(1)||W.name.replace(/\.xlsx$/i,'')).trim().replace(/\s+/g,' ');
+  return {cur,cyc:cyc?+cyc:0,titre,tot:{inv:v('inv'),ca:v('ca'),intr:v('intr'),rh:v('rh'),dopex:v('dopex'),ch:v('ch'),ebe:v('ebe'),dot:v('dot'),res:v('res')},
+    found:Object.fromEntries(Object.entries(T).map(([k,x])=>[k,!!x])),lines:{inv:lines(T.inv),ventes:lines(T.ca),intr:lines(T.intr),rh:lines(T.rh),dopex:lines(T.dopex)},treso,apport:r2(apport)}}
+
+/* ---------- Gantt : barres colorées → projet et tâches ---------- */
+const isoMon=(y,w)=>{const j4=new Date(Date.UTC(y,0,4)),d=(j4.getUTCDay()+6)%7;return new Date(j4.getTime()-d*864e5+(w-1)*7*864e5).toISOString().slice(0,10)};
+const barCol=c=>{if(!c)return false;if(c.startsWith('theme'))return +(c.split(':')[1]||0)<=0;const h=c.slice(-6),r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return (0.299*r+0.587*g+0.114*b)/255<0.6};
+const MOISN={JANV:1,JAN:1,FEV:2,FEVR:2,MARS:3,MAR:3,AVR:4,AVRIL:4,MAI:5,JUIN:6,JUIL:7,AOUT:8,SEPT:9,SEP:9,OCT:10,NOV:11,DEC:12};
+function bpGantt(W,E){const GS=bpGrid(W,E);
+  for(const G of GS){const sh=W.sheets[G.si];let hr=0;for(let r=1;r<=Math.min(G.mr,12);r++){const R=G.rows[r]||{};if(Object.values(R).filter(x=>/^S\s?\d{1,2}$/.test(String(x.v).trim())).length>=6){hr=r;break}}if(!hr)continue;
+    const wk={};let yr=0,mo=0;for(let c=2;c<=sh.mc;c++){const m=(G.rows[hr-1]||{})[c];if(m&&typeof m.v==='string'){const N=bpNorm(m.v),y=/(\d{4})/.exec(N),mn=/([A-Z]+)/.exec(N);if(y)yr=+y[1];if(mn&&MOISN[mn[1]])mo=MOISN[mn[1]]}
+      const x=(G.rows[hr]||{})[c];if(x&&/^S\s?\d{1,2}$/.test(String(x.v).trim())&&yr){const w=+String(x.v).replace(/\D/g,'');wk[c]={w,y:(mo===12&&w<5)?yr+1:(mo===1&&w>50)?yr-1:yr}}}
+    const cols=Object.keys(wk).map(Number);if(cols.length<6)continue;const tasks=[];let phase='';
+    for(let r=hr+1;r<=sh.mr;r++){const L=G.lab(r).trim();if(!L)continue;const bars=cols.filter(c=>barCol(sh.fill.get(colL(c)+r)));
+      if(!bars.length){if(/^\d+\s*[.)-]/.test(L)||L===L.toUpperCase())phase=L.replace(/^\d+\s*[.)-]\s*/,'').slice(0,60);continue}
+      const ws=bars.map(c=>wk[c]),deb=isoMon(ws[0].y,ws[0].w),fin=addDays(isoMon(ws.at(-1).y,ws.at(-1).w),6),resp=(G.rows[r]||{})[2];
+      tasks.push({nom:L.slice(0,100),phase,debut:deb,fin,qui:resp&&typeof resp.v==='string'?resp.v.trim().slice(0,40):'',sem:ws.map(x=>'S'+String(x.w).padStart(2,'0')),suite:bars.length===bars.at(-1)-bars[0]+1})}
+    if(tasks.length)return {sheet:G.name,tasks,debut:tasks.map(t=>t.debut).sort()[0],fin:tasks.map(t=>t.fin).sort().at(-1)}}
+  return null}
+
+/* ---------- Écran d'import ---------- */
+let BPI=null;
+function bpiFixes(st){const out=[];BPI.issues.forEach((x,i)=>{const f=x.fix;if(!f)return;
+    if(f.amt){const v=+st.zv[i];if(v>0)out.push({si:f.si,a:f.a,v:r2(v/(f.q||1)),i});return}
+    if(!st.chk.has(i))return;if(f.opts){const v=+(st.opt[i]??f.v);out.push({si:f.si,a:f.a,v,i});return}out.push({...f,i})});return out}
+function bpiApply(fx){const W=cloneW(BPI.W0);for(const f of fx){if(f.recalc)continue;const cell=W.sheets[f.si].cells.get(f.a)||{v:null,f:null};
+    if('f' in f){cell.f=f.f;cell.unsup=false}else if('v' in f){cell.f=null;cell.v=f.v}else if('text' in f){cell.f=null;cell.v=f.text}W.sheets[f.si].cells.set(f.a,cell)}
+  return {W,E:xlEval(W)}}
+function bpiGuessAct(t){const N=bpNorm(t),agri=/GOMBO|AUBERGINE|TOMATE|LEGUME|MARAICH|HECTARE|CULTURE|SEMIS|RECOLTE/.test(N),ws=N.split(/[^A-Z]+/).filter(w=>w.length>=4);let best=null,sc=0;
+  for(const a of live(D.acts)){const A=bpNorm(a.nom);let s=ws.filter(w=>A.includes(w)).length*2;if(agri&&/FERME|MARAICH|AGRI|CULTURE/.test(A))s+=3;if(/POULET|VOLAILLE|AVICOL/.test(N)&&/POULET|VOLAILLE/.test(A))s+=3;if(/POISSON|PISCI|TILAPIA/.test(N)&&/PISCI/.test(A))s+=3;if(s>sc){sc=s;best=a}}return best}
+async function bpImport(buf,name){const W0=await xlsxRead(buf,name),E0=xlEval(W0),issues=bpChecks(W0,E0);BPI={W0,name,issues};
+  BPI.st={chk:new Set(issues.map((x,i)=>x.fix&&!x.fix.amt?i:-1).filter(i=>i>=0)),zv:{},opt:{},cyc:1,gantt:true,act:(bpiGuessAct(bpExtract(W0,E0).titre)||{}).id||''};BPI.gantt=bpGantt(W0,E0);bpiShow()}
+function bpiRead(){const st=BPI.st,f=$('#fbpi');if(!f)return st;st.chk=new Set(Array.from(f.querySelectorAll('[name=fx]:checked')).map(e=>+e.value));
+  for(const e of f.querySelectorAll('[name=zv]'))st.zv[e.dataset.i]=e.value;for(const e of f.querySelectorAll('select[name=opt]'))st.opt[e.dataset.i]=e.value;
+  st.titre=f.titre.value;st.cible=f.cible.value;st.cyc=f.cyc.value;if(f.taux)st.taux=f.taux.value;st.gantt=!!(f.gantt&&f.gantt.checked);return st}
+function bpiShow(){const {issues,name,st}=BPI,fx=bpiFixes(st),{W,E}=bpiApply(fx),x=bpExtract(W,E),cur=x.cur,M=v=>money(v,cur),lvl={err:['r','Erreur'],warn:['y','À vérifier'],info:['','Conseil']},g=BPI.gantt;
+  const minT=x.treso?(()=>{const R=x.treso.rows.find(r=>/SOLDE.*(FINAL|FIN DE|CUMUL)/.test(bpNorm(r[0])));if(!R)return null;let m=Infinity,k=0;R.slice(1).forEach((v,i)=>{if(v!==null&&v<m){m=v;k=i}});return [m,x.treso.cols[k]]})():null;
+  const nE=issues.filter(i=>i.lvl==='err').length,nW=issues.filter(i=>i.lvl==='warn').length,titre=st.titre??x.titre.slice(0,120),cib=st.cible||(st.act?JSON.stringify({t:'act',id:st.act}):'{"t":"new"}');
+  const fixUI=(it,i)=>{const f=it.fix;if(!f)return '';
+    if(f.amt)return `<label class="chk small">${esc(f.desc)} <input type="number" name="zv" data-i="${i}" min="0" step="any" inputmode="decimal" placeholder="${esc(cur)}" value="${esc(st.zv[i]||'')}" style="width:9em"></label>`;
+    return `<label class="chk small"><input type="checkbox" name="fx" value="${i}" ${st.chk.has(i)?'checked':''}> <span>Correction proposée : ${esc(f.desc)}${f.opts?`<span class="small muted" style="display:block;font-weight:400">« Réserve 1 mois » ajoute environ un mois de dépenses pour faire face aux retards de vente ; « plus bas » = trésorerie du mois le plus serré.</span><select name="opt" data-i="${i}" style="margin-top:6px;width:100%">${f.opts.map(([v,l])=>{const ch=+(st.opt[i]??f.v);return `<option value="${v}" ${ch===v?'selected':''}>${esc(l)} : ${fmtQ(v)}${minT&&st.chk.has(i)?` → plus bas ${fmtQ(Math.round(minT[0]+v-ch))}`:''}</option>`}).join('')}</select>`:''}</span></label>`};
+  openSheet(`<h2>Vérification du business plan</h2><p class="small muted">${esc(name)} · ${BPI.W0.sheets.length} feuille(s) · montants en ${esc(cur)} · chaque formule a été recalculée</p>
+  <p>${nE?`<span class="tag r">${nE} erreur(s)</span> `:''}${nW?`<span class="tag y">${nW} point(s) à vérifier</span> `:''}${!nE&&!nW?'<span class="tag g">Aucune erreur de calcul trouvée</span>':''}</p>
+  <form id="fbpi">
+  ${issues.length?`<h3>Ce que l'application a trouvé</h3>${issues.map((it,i)=>`<div class="card bpi ${it.lvl}"><div class="top"><span class="tag ${lvl[it.lvl][0]}">${lvl[it.lvl][1]}</span><span class="small muted">${esc(it.where)}</span></div><div>${esc(it.msg)}</div>${fixUI(it,i)}</div>`).join('')}
+  <div class="btns"><button type="button" class="ghost" data-act="bpiPrev">Recalculer avec mes choix</button></div>`:''}
+  <h3>Chiffres du plan ${fx.length?'(avec vos corrections)':''}</h3>
+  <table><tbody>${[['Chiffre d\'affaires',x.tot.ca],['Intrants',x.tot.intr],['Personnel',x.tot.rh],['Charges opérationnelles diverses',x.tot.dopex],['Total des charges d\'exploitation',x.tot.ch],['Excédent brut d\'exploitation',x.tot.ebe],['Amortissements',x.tot.dot],['Résultat net avant impôt',x.tot.res],['Investissements',x.tot.inv],['Apport de départ',x.apport]].map(([l,v])=>`<tr><td>${l}</td><td class="n ${v<0?'neg':''}">${M(v)}</td></tr>`).join('')}
+  ${minT?`<tr class="sub"><td>Trésorerie la plus basse (${esc(minT[1])})</td><td class="n ${minT[0]<0?'neg':'pos'}">${M(minT[0])}</td></tr>`:''}</tbody></table>
+  ${minT&&minT[0]<-0.005?`<p class="neg small"><b>Avec ces chiffres, la trésorerie est négative en ${esc(minT[1])}.</b> Il manque ${M(-minT[0])} : augmentez l'apport de départ d'au moins ${M(Math.ceil(-minT[0]/100)*100)}${issues.some(it=>it.fix&&it.fix.opts)?' (choisissez une option d\'apport plus élevée ou ajustez dans le business plan)':''}.</p>`:''}
+  ${Object.entries({inv:'investissements',ca:'ventes',intr:'intrants',rh:'personnel',dopex:'charges diverses'}).filter(([k])=>!x.found[k]).length?`<p class="small neg">Parties non reconnues : ${Object.entries({inv:'investissements',ca:'ventes',intr:'intrants',rh:'personnel',dopex:'charges diverses'}).filter(([k])=>!x.found[k]).map(([,l])=>l).join(', ')}. Vous pourrez les compléter à la main dans le business plan.</p>`:''}
+  <h3>Créer le business plan dans l'application</h3>
+  <label class="f">Titre<input name="titre" value="${esc(titre)}" maxlength="120"></label>
+  <div class="row2"><label class="f">Porte sur<select name="cible"><option value='{"t":"new"}'>Nouvelle activité</option>${live(D.acts).map(a=>{const v=JSON.stringify({t:'act',id:a.id});return `<option value='${esc(v)}' ${cib===v?'selected':''}>Activité : ${esc(a.nom)}</option>`}).join('')}${live(D.projects).map(p=>{const v=JSON.stringify({t:'proj',id:p.id});return `<option value='${esc(v)}' ${cib===v?'selected':''}>Projet : ${esc(p.nom)}</option>`}).join('')}</select></label>
+  <label class="f">Cycles par an<input type="number" name="cyc" min="1" max="6" step="1" value="${esc(st.cyc||1)}"></label></div>
+  ${cur!==BASE()?`<label class="f">Taux : 1 USD = combien de CDF ?<input type="number" name="taux" min="1" step="any" value="${esc(st.taux||RATE())}"></label>`:''}
+  ${g&&perm('projets')?`<label class="chk"><input type="checkbox" name="gantt" ${st.gantt?'checked':''}> <span>Créer aussi le projet et ses ${g.tasks.length} tâches à partir du Gantt (${dfr(g.debut)} → ${dfr(g.fin)})</span></label>`:''}
+  <p class="small muted">${x.cyc?`Le plan porte sur un cycle de ${x.cyc} mois. `:''}L'application calcule sur l'année : chiffre d'affaires et charges du cycle × nombre de cycles par an ; intrants et charges diverses = charges variables ; personnel = charges fixes ; apport de départ = apport du plan. Croissance, inflation et délai de paiement des clients prennent les valeurs par défaut : ajustez-les ensuite dans les hypothèses.</p>
+  <div class="btns"><button class="pr" type="submit">Créer le business plan</button><button type="button" data-act="bpiXlsx">Télécharger l'Excel corrigé</button><button type="button" class="ghost" data-act="close">Annuler</button></div></form>`)}
+async function bpiCreate(){const st=bpiRead(),fx=bpiFixes(st),{W,E}=bpiApply(fx),x=bpExtract(W,E),cyc=Math.max(1,Math.min(6,Math.round(+st.cyc||1)));
+  const k=x.cur===BASE()?1:x.cur==='USD'&&BASE()==='CDF'?(+st.taux||RATE()):x.cur==='CDF'&&BASE()==='USD'?1/(+st.taux||RATE()):1,K=v=>r2(v*k);
+  const ca=x.tot.ca,vari=x.tot.intr+x.tot.dopex;let cible={t:'new'};try{cible=JSON.parse(st.cible)}catch(e){}
+  const done=new Set(fx.map(f=>f.i)),b={id:uid(),titre:(st.titre||x.titre).slice(0,120),cible,horizon:5,date:today(),sec:{},
+    invest:x.lines.inv.filter(l=>l[1]>0).map(([des,mt,du])=>({des:des.slice(0,100),mt:K(mt),duree:du>0?Math.min(50,du):5})),
+    fin:{apport:K(x.apport),emprunt:0,taux:18,duree:3,subv:0},
+    hyp:{ca1:K(ca*cyc),g:0,cv:ca?Math.round(vari/ca*1000)/10:45,fixes:K(x.tot.rh*cyc),inf:8,bfrj:30,is:30,mini:1,actu:15},
+    imp:{file:BPI.name.slice(0,120),at:today(),cur:x.cur,k,cyc,cycM:x.cyc,tot:x.tot,apport:x.apport,lines:x.lines,treso:x.treso,
+      issues:BPI.issues.map((it,i)=>[it.lvl,it.where,it.msg.slice(0,400),it.fix?(done.has(i)?1:0):-1])}};
+  if(!b.invest.length&&x.tot.inv>0)b.invest=[{des:'Investissements',mt:K(x.tot.inv),duree:5}];
+  let nt=0;const g=BPI.gantt;
+  if(g&&st.gantt&&perm('projets')){const act=cible.t==='act'?cible.id:cible.t==='proj'?(byId('projects',cible.id)||{}).act||'':'';
+    const p={id:uid(),nom:b.titre.slice(0,100),act,resp:ME,debut:g.debut,fin:g.fin,statut:g.debut>today()?'Prévu':'En cours',budget:K(x.tot.ch+x.tot.inv),client:'',desc:`Créé depuis le Gantt « ${g.sheet} » du fichier ${BPI.name}.`.slice(0,800)};
+    await commit('projects',p,'projet importé',p.nom);
+    for(const t of g.tasks){await commit('tasks',{id:uid(),projet:p.id,nom:t.nom,phase:t.phase,resp:ME,dep:'',debut:t.debut,fin:t.fin,jalon:false,av:0,note:[t.qui?'Exécutant : '+t.qui:'',t.suite?'':'Semaines prévues : '+t.sem.join(', ')].filter(Boolean).join(' · ').slice(0,300)},'tâche importée',t.nom,{noAudit:true});nt++}
+    if(cible.t==='new')b.cible={t:'proj',id:p.id};b.imp.proj=p.id}
+  await commit('bps',b,'business plan importé',b.titre);closeSheet();render();bpOpen(b.id);toast(nt?`Business plan créé, avec le projet et ses ${nt} tâches`:'Business plan créé à partir du fichier Excel')}
+async function bpiXlsx(){const st=bpiRead(),fx=bpiFixes(st),{W,E}=bpiApply(fx),z=BPI.W0.z,te=new TextEncoder(),out=[];let wbx=null,ct=null,rel=null;
+  const fixBy={};for(const f of fx)if(!f.recalc)(fixBy[f.si]=fixBy[f.si]||[]).push(f);
+  for(const name of Object.keys(z)){if(name==='xl/calcChain.xml')continue;let data=await zipBytes(z[name]);
+    const si=W.sheets.findIndex(s=>s.path===name);
+    if(si>=0){const doc=xdoc(new TextDecoder().decode(data)),NS=doc.documentElement.namespaceURI,mk=n=>doc.createElementNS(NS,n);
+      for(const c of xk(doc,'c')){const a=c.getAttribute('r'),fe=xk(c,'f')[0];const fx=(fixBy[si]||[]).find(f=>f.a===a);
+        const setV=v=>{let ve=xk(c,'v')[0];if(v===null||v===undefined){if(ve)c.removeChild(ve);return}if(!ve){ve=mk('v');c.appendChild(ve)}ve.textContent=String(v)};
+        if(fx){for(const e of [...xk(c,'f'),...xk(c,'v'),...xk(c,'is')])c.removeChild(e);c.removeAttribute('t');
+          if('f' in fx){const f=mk('f');f.textContent=fx.f;c.appendChild(f);const v=E.val(si,a);if(xnum(v))setV(v)}
+          else if('v' in fx)setV(fx.v);else{c.setAttribute('t','inlineStr');const is=mk('is'),t=mk('t');t.textContent=fx.text;is.appendChild(t);c.appendChild(is)}continue}
+        if(fe){const cell=W.sheets[si].cells.get(a);if(fe.getAttribute('t')==='shared'&&cell&&cell.f){fe.textContent=cell.f;fe.removeAttribute('t');fe.removeAttribute('si');fe.removeAttribute('ref')}
+          const v=E.val(si,a);if(xnum(v)){c.removeAttribute('t');setV(v)}}}
+      data=te.encode(new XMLSerializer().serializeToString(doc))}
+    if(name==='xl/workbook.xml'){wbx=data;continue}if(name==='[Content_Types].xml'){ct=data;continue}if(name==='xl/_rels/workbook.xml.rels'){rel=data;continue}
+    out.push({name,data})}
+  {const d=xdoc(new TextDecoder().decode(wbx)),NS=d.documentElement.namespaceURI;let cp=xk(d,'calcPr')[0];if(!cp){cp=d.createElementNS(NS,'calcPr');d.documentElement.appendChild(cp)}cp.setAttribute('fullCalcOnLoad','1');out.push({name:'xl/workbook.xml',data:te.encode(new XMLSerializer().serializeToString(d))})}
+  {const d=xdoc(new TextDecoder().decode(ct));for(const o of xk(d,'Override'))if(/calcChain/.test(o.getAttribute('PartName')))o.parentNode.removeChild(o);out.push({name:'[Content_Types].xml',data:te.encode(new XMLSerializer().serializeToString(d))})}
+  {const d=xdoc(new TextDecoder().decode(rel));for(const o of xk(d,'Relationship'))if(/calcChain/.test(o.getAttribute('Target')))o.parentNode.removeChild(o);out.push({name:'xl/_rels/workbook.xml.rels',data:te.encode(new XMLSerializer().serializeToString(d))})}
+  out.sort((a,b)=>a.name==='[Content_Types].xml'?-1:b.name==='[Content_Types].xml'?1:0);
+  download(BPI.name.replace(/\.xlsx$/i,'')+'_corrige.xlsx',zipWrite(out),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')}
+
+/* ---------- Affichage dans la fiche du business plan ---------- */
+function bpImpBlock(b){const I=b.imp;if(!I)return '';const M=v=>money(v,I.cur),lvl={err:['r','Erreur'],warn:['y','À vérifier'],info:['','Conseil']},T=I.tot||{};
+  const tab=(t,L,h)=>L&&L.length?`<h4>${t}</h4><table><tbody>${L.map(l=>`<tr><td>${esc(l[0])}</td>${h?`<td class="n small muted">${l[2]?esc(l[2])+' an(s)':''}</td>`:''}<td class="n">${M(l[1])}</td></tr>`).join('')}</tbody></table>`:'';
+  return `<details><summary><b>Plan importé depuis Excel</b> <span class="small muted">${esc(I.file)} · ${dfr(I.at)}</span></summary>
+  ${I.proj&&byId('projects',I.proj)?`<p class="small">Projet créé à partir du Gantt : <b>${esc(byId('projects',I.proj).nom)}</b> (${live(D.tasks).filter(t=>t.projet===I.proj).length} tâches), dans Projets.</p>`:''}
+  <p class="small muted">Montants du fichier en ${esc(I.cur)}${I.k!==1?` (convertis au taux de ${fmt(I.k)} pour les calculs de rentabilité)`:''}${I.cycM?` · cycle de ${I.cycM} mois`:''} · ${I.cyc} cycle(s) par an retenu(s).</p>
+  ${(I.issues||[]).length?`<h4>Vérification à l'import</h4>${I.issues.map(([l,w,m,a])=>`<div class="small" style="margin:4px 0"><span class="tag ${(lvl[l]||lvl.info)[0]}">${(lvl[l]||lvl.info)[1]}</span> ${w?`<span class="muted">${esc(w)}</span> · `:''}${esc(m)}${a===1?' <b class="pos">Corrigé</b>':a===0?' <span class="muted">(correction non appliquée)</span>':''}</div>`).join('')}`:''}
+  <h4>Compte d'exploitation du cycle</h4><table><tbody>${[['Chiffre d\'affaires',T.ca],['Intrants',T.intr],['Personnel',T.rh],['Charges diverses',T.dopex],['Excédent brut d\'exploitation',T.ebe],['Amortissements',T.dot],['Résultat avant impôt',T.res]].map(([l,v])=>`<tr><td>${l}</td><td class="n ${v<0?'neg':''}">${M(v||0)}</td></tr>`).join('')}</tbody></table>
+  ${tab('Investissements',I.lines.inv,1)}${tab('Ventes',I.lines.ventes)}${tab('Intrants',I.lines.intr)}${tab('Personnel',I.lines.rh)}${tab('Charges diverses',I.lines.dopex)}
+  ${I.treso?`<h4>Trésorerie mensuelle</h4><div class="scroll"><table><thead><tr><th></th>${I.treso.cols.map(c=>`<th class="n">${esc(c)}</th>`).join('')}</tr></thead><tbody>${I.treso.rows.map(r=>`<tr class="${/SOLDE|TOTAL|FLUX/.test(bpNorm(r[0]))?'sub':''}"><td>${esc(r[0])}</td>${r.slice(1).map(v=>`<td class="n ${v<0?'neg':''}">${v===null?'':fmt(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:''}</details>`}
+
 /* ============ PROJETS, TÂCHES ET GANTT ============ */
 const PSTAT=['Prévu','En cours','Suspendu','Terminé'];
 function projStats(p){const ts=live(D.tasks).filter(t=>t.projet===p.id),t=today();const av=ts.length?Math.round(ts.reduce((s,x)=>s+(+x.av||0),0)/ts.length):(p.statut==='Terminé'?100:0);return {ts,av,late:ts.filter(x=>taskLate(x,t)).length}}
@@ -3990,6 +4269,7 @@ document.addEventListener('click',ev=>{
     delDoc:async()=>{if(!ask('Supprimer ce brouillon ?'))return;const d=JSON.parse(JSON.stringify(byId('docs',id)));d.del=true;await commit('docs',d,'suppression brouillon',d.num||'');if(d.from){const s=byId('docs',d.from);if(s&&s.conv){const c=JSON.parse(JSON.stringify(s));c.conv=false;await commit('docs',c)}}closeSheet();render()},
     printDoc:()=>doPrint(docHTML(byId('docs',id))),
     fnForm:()=>fnForm(id),
+    bpiPrev:()=>{bpiRead();bpiShow()},bpiXlsx:()=>bpiXlsx(),
     waForm:()=>waForm(b.dataset.v==='on'),
     bkNow:async()=>{toast('Copie en cours…');await snapBackup(true);render();toast('Copie chiffrée déposée sur le serveur')},
     bkList:async()=>bkListView(await bkList()),
@@ -4137,6 +4417,7 @@ document.addEventListener('change',e=>{
   if(t.id==='yearSel'){const y=+t.value;if(y>=2000&&y<=2100){UI.year=y;saveUI();render()}}
   if(t.id==='empph'&&t.files[0]){fileToJpeg(t.files[0],220,0.72).then(o=>{const b=new Blob([o.a],{type:'image/jpeg'}),fr=new FileReader();fr.onload=()=>{$('#fe [name=photo]').value=fr.result;const av=t.closest('div').querySelector('img,span');if(av)av.outerHTML=`<img src="${fr.result}" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover">`};fr.readAsDataURL(b)}).catch(e=>toast(e.message))}
   if((t.id==='logo'||t.id==='sig')&&t.files[0])imgToData(t.files[0],400,d=>run(async()=>{const s=JSON.parse(JSON.stringify(D.settings));s[t.id==='logo'?'logo':'signature']=d;await commitSettings(s,t.id==='logo'?'logo':'signature','');render();toast('Image enregistrée')}));
+  if(t.id==='bpimp'&&t.files[0]){const fl=t.files[0];t.value='';fl.arrayBuffer().then(buf=>run(async()=>{toast('Lecture et vérification du fichier…');await bpImport(buf,fl.name)}));}
   if(t.id==='bkt'&&t.files[0]){const nm=t.files[0].name,r=new FileReader();r.onload=()=>run(async()=>{const {p}=await unpackFile(r.result,LOC.pass);await showCheck(p,'Fichier '+nm)});r.readAsText(t.files[0]);t.value=''}
   if(t.id==='imp'&&t.files[0]){const r=new FileReader();r.onload=()=>run(()=>importSync(r.result));r.readAsText(t.files[0])}
   if(t.id==='joinFile'&&t.files[0]){const r=new FileReader();r.onload=()=>run(()=>joinStart(r.result));r.readAsText(t.files[0])}
@@ -4243,6 +4524,7 @@ async function submitForm(f,F){switch(f.id){
     case 'frole':{const id=f.dataset.id;const r=id?JSON.parse(JSON.stringify(byId('roles',id))):{id:'r_'+uid()};r.nom=F.nom.trim().slice(0,40);if(ROLES.includes(r.nom))throw new Error('Nom réservé');r.perms={};for(const [p] of PERMS)if(F['p_'+p])r.perms[p]=true;await commit('roles',r,id?'modification rôle':'nouveau rôle',r.nom);closeSheet();render();toast('Rôle enregistré');break}
     case 'fclose':{const m=F.m;if(!ask('Clôturer définitivement jusqu\'au '+dfr(lastDay(m))+' ? Cette action est irréversible.'))return;await closePeriod(m);render();toast('Période clôturée');break}
     case 'fwa':{if(f.dataset.v==='on'){await waEnable(F.pin);toast('Protection par empreinte activée')}else{await waDisable(F.pin);toast('Protection par empreinte retirée')}closeSheet();render();break}
+    case 'fbpi':await bpiCreate();break;
     case 'ffn':{await saveFn(f.dataset.id,F);closeSheet();render();docView(f.dataset.id);toast('Code de facture normalisée enregistré');break}
     case 'fset':{const s=JSON.parse(JSON.stringify(D.settings));for(const k of ['nom','adresse','rccm','idnat','nif','tel','email','mentions','annexe'])s[k]=(F[k]||'').slice(0,500);for(const k of ['taux','tva','cnssSal','cnssPat','inpp','onem','iprFam','iprFamMax','seuil1','seuil2','seuilTreso','tolRetard','cgMois','cgAnc'])s[k]=Math.max(0,+F[k]||0);if(F.feries!==undefined)s.feries=String(F.feries).slice(0,1500);s.matin=!!F.matin;if(s.seuil2>0&&validators().length<2)throw new Error('La double validation exige au moins deux utilisateurs ayant le droit de valider. Ajoutez d\'abord un comptable.');if(!(s.taux>0))throw new Error('Taux invalide');s.tvaDefaut=!!F.tvaDefaut;if(F.fnorm!==undefined){s.fnorm=['oui','non'].includes(F.fnorm)?F.fnorm:'';s.fnDebut=RX.date.test(F.fnDebut||'')?F.fnDebut:'2025-12-01';s.fnDef=FN_DEF.some(x=>x[0]===F.fnDef)?F.fnDef:'e-UF'}await commitSettings(s,'réglages','');render();toast('Réglages enregistrés');break}
   }}
