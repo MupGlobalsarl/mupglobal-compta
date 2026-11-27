@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MupGlobal ERP — Installation et manuel</title>
+<meta name="theme-color" content="#0b2240">
+<link rel="icon" href="../icon-192.png">
+<style>
+:root{--n:#0b2240;--y:#ffd84a;--mut:#4a5d75;--bd:#d6e0ec;--bg:#f4f7fb}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#13233a;background:var(--bg)}
+header{background:linear-gradient(90deg,#0b2240,#123c69);color:#fff;padding:18px 18px 22px;border-top:4px solid var(--y)}
+.hd{max-width:860px;margin:0 auto;display:flex;gap:14px;align-items:center}
+.hd img{width:52px;height:52px;border-radius:12px;background:#fff;padding:3px}
+.hd h1{margin:0;font-size:22px}.hd p{margin:2px 0 0;color:#c9d6e6;font-size:14px}
+main{max-width:860px;margin:0 auto;padding:18px}
+video{width:100%;border-radius:12px;background:#000;display:block}
+.card{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:16px 18px;margin:16px 0}
+h2{font-size:19px;margin:0 0 8px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}
+.tabs button{font:600 15px inherit;font-family:inherit;padding:9px 14px;border-radius:20px;border:1px solid var(--bd);background:#fff;color:var(--n);cursor:pointer}
+.tabs button.on{background:var(--n);color:#fff;border-color:var(--n)}
+ol{padding-left:22px;margin:6px 0}li{margin:6px 0}
+.pane{display:none}.pane.on{display:block}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+a.bt{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-weight:700;padding:12px 16px;border-radius:10px;background:var(--n);color:#fff}
+a.bt.y{background:var(--y);color:var(--n)}
+.warn{background:#fff4e5;border-left:5px solid #dd6b20;border-radius:10px;padding:12px 14px;margin:14px 0;font-size:15px}
+.small{font-size:13.5px;color:var(--mut)}
+</style>
+</head>
+<body>
+<header><div class="hd"><img src="../icon-192.png" alt=""><div><h1>MupGlobal ERP</h1><p>Installation de l'application et manuel de l'utilisateur</p></div></div></header>
+<main>
+<video controls preload="metadata" playsinline poster="poster.jpg" src="installation.mp4"></video>
+<p class="small">Vidéo de 4 minutes : Android, iPhone, ordinateur, puis rejoindre l'entreprise avec votre invitation.</p>
+
+<div class="card">
+<h2>1. Installer l'application</h2>
+<div class="tabs" role="tablist"><button class="on" data-p="android">Android</button><button data-p="iphone">iPhone</button><button data-p="pc">Ordinateur</button></div>
+<div class="pane on" id="android"><ol>
+<li>Ouvrez le lien de l'application dans <b>Google Chrome</b> (bouton ci-dessous).</li>
+<li>Touchez les <b>trois points</b> en haut à droite, puis <b>Installer l'application</b> (ou <b>Ajouter à l'écran d'accueil</b>).</li>
+<li>Confirmez avec <b>Installer</b> : l'icône <b>MG ERP</b> apparaît parmi vos applications.</li>
+<li>Téléchargez le fichier d'invitation reçu : il va dans <b>Téléchargements</b>.</li></ol></div>
+<div class="pane" id="iphone"><ol>
+<li>Ouvrez le lien de l'application dans <b>Safari</b> (pas dans WhatsApp ni dans un autre navigateur).</li>
+<li>Touchez <b>Partager</b> (le carré avec une flèche vers le haut), faites défiler, puis <b>Sur l'écran d'accueil</b>.</li>
+<li>Touchez <b>Ajouter</b> : l'icône <b>MG ERP</b> apparaît sur l'écran d'accueil.</li>
+<li>Dans WhatsApp, ouvrez le fichier d'invitation, puis <b>Partager › Enregistrer dans Fichiers</b>.</li></ol></div>
+<div class="pane" id="pc"><ol>
+<li>Ouvrez le lien de l'application dans <b>Chrome</b> ou <b>Edge</b>, sous Windows ou Mac.</li>
+<li>Cliquez sur l'<b>icône d'installation</b> à droite de la barre d'adresse (un écran avec une flèche), ou passez par le menu.</li>
+<li>Cliquez sur <b>Installer</b> : l'application s'ouvre dans sa propre fenêtre, avec une icône sur le bureau.</li>
+<li>Enregistrez le fichier d'invitation reçu par e-mail ou WhatsApp.</li></ol></div>
+<div class="btns"><a class="bt y" href="../">Ouvrir l'application</a></div>
+</div>
+
+<div class="card">
+<h2>2. Rejoindre l'entreprise</h2>
+<ol>
+<li>Ouvrez <b>MG ERP</b> depuis son icône et choisissez <b>Rejoindre (collaborateur)</b>.</li>
+<li>Touchez <b>Choisir le fichier d'invitation</b> et sélectionnez le fichier reçu.</li>
+<li>Saisissez le <b>code entreprise</b> et le <b>PIN provisoire</b> donnés par le gérant, puis choisissez votre propre PIN (6 chiffres ou plus).</li>
+<li>Vos données arrivent d'elles-mêmes : il n'y a rien d'autre à configurer.</li>
+</ol>
+<div class="warn"><b>Ne choisissez jamais « Créer l'entreprise »</b> si vous êtes collaborateur : vous créeriez une société séparée. Le code entreprise et le PIN ne s'envoient jamais par message.</div>
+</div>
+
+<div class="card">
+<h2>3. Le manuel de l'utilisateur</h2>
+<p>Chaque concept et chaque démarche de A à Z, avec la comptabilité SYSCOHADA expliquée (PDF, 78 pages, 5 Mo).</p>
+<div class="btns"><a class="bt" href="Manuel_MupGlobal_ERP.pdf" target="_blank" rel="noopener">Lire le manuel</a><a class="bt y" href="Manuel_MupGlobal_ERP.pdf" download>Télécharger le PDF</a></div>
+<p class="small">Dans l'application, le manuel et cette vidéo se retrouvent à tout moment dans <b>Plus › Aide</b>.</p>
+</div>
+<p class="small">MupGlobal SARL · Lubumbashi, République démocratique du Congo</p>
+</main>
+<script>
+const ua=navigator.userAgent,ios=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),and=/Android/.test(ua);
+function show(p){for(const b of document.querySelectorAll('.tabs button'))b.classList.toggle('on',b.dataset.p===p);for(const x of document.querySelectorAll('.pane'))x.classList.toggle('on',x.id===p)}
+document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b)show(b.dataset.p)});
+show(ios?'iphone':and?'android':'pc');
+</script>
+</body>
+</html>
